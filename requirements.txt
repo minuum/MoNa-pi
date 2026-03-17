@@ -1,0 +1,8 @@
+torch>=2.0.0
+transformers
+accelerate
+einops
+diffusers
+h5py
+numpy
+matplotlib
