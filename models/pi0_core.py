@@ -14,14 +14,17 @@ class Pi0VLA(nn.Module):
         hidden_dim=512,
         vision_model_id="google/siglip-so400m-patch14-384",
         lang_model_id="google/gemma-2b",
+        full_seq_cond: bool = False,
         **kwargs
     ):
         super().__init__()
-        
+        self.full_seq_cond = full_seq_cond
+
         # 1. Real pi0 Backbone (SigLIP + Gemma + Resampler)
         self.backbone = Pi0Backbone(
             vision_model_id=vision_model_id,
-            lang_model_id=lang_model_id
+            lang_model_id=lang_model_id,
+            full_seq_cond=full_seq_cond,
         )
         
         self.backbone_out_dim = self.backbone.lang_hidden_size # e.g., 2048

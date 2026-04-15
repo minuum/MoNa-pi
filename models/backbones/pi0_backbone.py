@@ -29,11 +29,13 @@ class Pi0Backbone(nn.Module):
         lang_model_id: str = "google/gemma-2b",
         num_latents: int = 64,
         max_text_len: int = 48,
+        full_seq_cond: bool = False,
         **kwargs,
     ):
         super().__init__()
         self.num_latents = num_latents
         self.max_text_len = max_text_len
+        self.full_seq_cond = full_seq_cond
 
         token = os.getenv("HF_TOKEN")
 
@@ -82,7 +84,8 @@ class Pi0Backbone(nn.Module):
             images:     (B, N_cam, C, H, W)   FP16, CLIP 정규화됨
             text_input: List[str] 길이 B        — 자연어 지시문
         Returns:
-            cond: (B, 64, 2048)  언어 정보가 반영된 시각 conditioning
+            full_seq_cond=False: (B, 64, 2048)     64 latent만 (기본)
+            full_seq_cond=True:  (B, 64+L, 2048)   전체 VLM 시퀀스 (π0 Action Expert 방식)
         """
         B, N, C, H, W = images.shape
         dtype  = images.dtype
@@ -131,11 +134,15 @@ class Pi0Backbone(nn.Module):
                 inputs_embeds=combined_embeds,
                 attention_mask=combined_mask,
             )
-            # 언어 grounded 시각 latent 슬라이스만 반환
-            cond = gemma_out.last_hidden_state[:, : self.num_latents]
-            # (B, 64, 2048)
+            hidden = gemma_out.last_hidden_state  # (B, 64+L, 2048)
+            if self.full_seq_cond:
+                # π0 Action Expert 방식: 전체 VLM 시퀀스를 FlowHead에 전달
+                cond = hidden                           # (B, 64+L, 2048)
+            else:
+                # 기본: 언어 grounded 시각 latent 슬라이스만 반환
+                cond = hidden[:, : self.num_latents]   # (B, 64, 2048)
         else:
             # 언어 없을 때: 시각 latent만 반환 (순수 시각 conditioning)
-            cond = visual_latents
+            cond = visual_latents                      # (B, 64, 2048)
 
-        return cond  # (B, 64, 2048)
+        return cond

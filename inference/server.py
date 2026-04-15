@@ -62,8 +62,11 @@ _latency_history: deque[float] = deque(maxlen=100)
 _inference_lock = asyncio.Lock()  # 동시 추론 방지 (GPU 단일 스트림)
 
 
+_mock_mode: bool = False  # --mock 플래그 시 모델 로드 없이 0 액션 반환
+
+
 def get_engine() -> MoNaPiEngine:
-    if _engine is None:
+    if not _mock_mode and _engine is None:
         raise HTTPException(status_code=503, detail="엔진이 초기화되지 않았습니다")
     return _engine
 
@@ -95,6 +98,15 @@ async def metrics():
 @app.post("/predict", response_model=PredictResponse)
 async def predict(req: PredictRequest):
     global _request_count
+
+    # ── Mock 모드: 모델 없이 즉시 0 액션 반환 ──────────────────
+    if _mock_mode:
+        _request_count += 1
+        _latency_history.append(1.0)
+        return PredictResponse(
+            actions=np.zeros((10, 3)).tolist(),
+            latency_ms=1.0,
+        )
 
     engine = get_engine()
 
@@ -149,10 +161,16 @@ def main():
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--solver", default="heun", choices=["euler", "heun", "dpm"])
     parser.add_argument("--steps",  type=int, default=5, help="ODE 스텝 수")
+    parser.add_argument("--mock",   action="store_true",
+                        help="모델 로드 없이 0 액션 반환 (통합 테스트용)")
     args = parser.parse_args()
 
-    global _engine
-    _engine = build_engine(args)
+    global _engine, _mock_mode
+    _mock_mode = args.mock
+    if _mock_mode:
+        print("[Server] MOCK 모드 — 모델 로드 없이 실행")
+    else:
+        _engine = build_engine(args)
 
     print(f"[Server] 서버 시작: http://{args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
