@@ -302,6 +302,7 @@
     <li><a href="#roadmap">로드맵</a></li>
     <li><a href="#transfer">도메인 이전</a></li>
     <li><a href="#prompt">언어 설계</a></li>
+    <li><a href="#pi0compare">π0 비교</a></li>
   </ul>
   <a href="https://github.com/minuum/MoNa-pi" class="nav-gh" target="_blank">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
@@ -1589,6 +1590,238 @@ INTENT_LABELS = [
   <span class="cmt">├</span> 10% 빈 instruction dropout (OmniVLA 방식, 시각 fallback 강화)
   <span class="cmt">├</span> CoT 스타일: <span class="kw">"[TURN_LEFT] 왼쪽에 장애물이 있으므로 회전"</span> (이유 포함)
   <span class="cmt">└</span> GRPO 보상 기반 instruction 품질 필터링 (MobileVLA-R1 방식)
+    </div>
+
+  </div>
+</section>
+
+<!-- ════════════ π0 COMPARISON ════════════ -->
+<section id="pi0compare">
+  <div class="container">
+    <div class="section-label">π0 논문 심층 분석</div>
+    <h2>실제 π0 vs MoNa-π: 무엇이 같고 무엇이 다른가</h2>
+    <p class="section-desc">
+      Physical Intelligence의 π0 논문(Black et al., 2024)은 PaliGemma + Flow Matching Expert를 결합한
+      크로스-엠보디먼트 VLA를 제안한다. MoNa-π는 이 아키텍처를 모바일 내비게이션에 맞게 재해석한다.
+    </p>
+
+    <!-- ── 실제 π0 아키텍처 ── -->
+    <h3 style="margin:2.5rem 0 1rem; font-size:1.2rem; color:var(--text)">실제 π0 아키텍처</h3>
+    <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:2rem; margin-bottom:2rem;">
+      <svg viewBox="0 0 820 240" style="width:100%;max-width:820px;display:block;margin:0 auto;" font-family="monospace" font-size="12">
+        <!-- VLM Block -->
+        <rect x="20" y="20" width="260" height="200" rx="10" fill="#1a1f2e" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="150" y="44" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="600">PaliGemma 3B (고정)</text>
+        <rect x="40" y="55" width="100" height="36" rx="6" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+        <text x="90" y="77" text-anchor="middle" fill="#94a3b8" font-size="10">SigLIP SO400M</text>
+        <rect x="160" y="55" width="100" height="36" rx="6" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+        <text x="210" y="77" text-anchor="middle" fill="#94a3b8" font-size="10">Gemma-2B Trunk</text>
+        <text x="150" y="115" text-anchor="middle" fill="#64748b" font-size="10">↓ joint cross-attention ↓</text>
+        <rect x="55" y="125" width="190" height="30" rx="6" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
+        <text x="150" y="144" text-anchor="middle" fill="#93c5fd" font-size="10">VLM Tokens (visual+text)</text>
+        <text x="150" y="180" text-anchor="middle" fill="#64748b" font-size="10">10K 시간 · 7 로봇 · 68 태스크</text>
+        <text x="150" y="198" text-anchor="middle" fill="#64748b" font-size="10">크로스-엠보디먼트 사전학습</text>
+
+        <!-- Arrow -->
+        <line x1="280" y1="120" x2="340" y2="120" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+        <text x="310" y="112" text-anchor="middle" fill="#64748b" font-size="10">cond</text>
+
+        <!-- Action Expert Block -->
+        <rect x="340" y="20" width="240" height="200" rx="10" fill="#1a1f2e" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="460" y="44" text-anchor="middle" fill="#c4b5fd" font-size="11" font-weight="600">Action Expert (파인튜닝)</text>
+        <rect x="360" y="55" width="200" height="36" rx="6" fill="#0f172a" stroke="#475569" stroke-width="1"/>
+        <text x="460" y="77" text-anchor="middle" fill="#94a3b8" font-size="10">Flow Matching Transformer</text>
+        <text x="460" y="115" text-anchor="middle" fill="#64748b" font-size="10">↑ noisy action tokens x_t</text>
+        <rect x="370" y="125" width="180" height="30" rx="6" fill="#2d1b6e" stroke="#a78bfa" stroke-width="1"/>
+        <text x="460" y="144" text-anchor="middle" fill="#c4b5fd" font-size="10">joint attention (VLM ↔ action)</text>
+        <text x="460" y="180" text-anchor="middle" fill="#64748b" font-size="10">7DoF manipulation default</text>
+        <text x="460" y="198" text-anchor="middle" fill="#64748b" font-size="10">ODE 10→50 step</text>
+
+        <!-- Arrow -->
+        <line x1="580" y1="120" x2="640" y2="120" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+        <!-- Output -->
+        <rect x="640" y="90" width="160" height="60" rx="8" fill="#0f1a0f" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="720" y="116" text-anchor="middle" fill="#86efac" font-size="11">Action Chunk</text>
+        <text x="720" y="133" text-anchor="middle" fill="#64748b" font-size="10">50Hz · continuous</text>
+
+        <!-- Arrow marker -->
+        <defs><marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#475569"/></marker></defs>
+      </svg>
+    </div>
+
+    <!-- ── 핵심 차이점 비교 표 ── -->
+    <h3 style="margin:2rem 0 1rem; font-size:1.2rem; color:var(--text)">상세 비교</h3>
+    <div style="overflow-x:auto; margin-bottom:2.5rem;">
+      <table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+        <thead>
+          <tr style="background:var(--surface-2); border-bottom:1px solid var(--border);">
+            <th style="padding:0.75rem 1rem; text-align:left; color:var(--text-3); font-weight:600;">항목</th>
+            <th style="padding:0.75rem 1rem; text-align:left; color:#93c5fd; font-weight:600;">실제 π0</th>
+            <th style="padding:0.75rem 1rem; text-align:left; color:#86efac; font-weight:600;">MoNa-π</th>
+            <th style="padding:0.75rem 1rem; text-align:left; color:var(--text-3); font-weight:600;">격차</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:0.7rem 1rem; color:var(--text)">시각 인코더</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">SigLIP SO400M (1152D)</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">SigLIP SO400M (1152D) ✓</td>
+            <td style="padding:0.7rem 1rem;"><span style="background:#14532d;color:#86efac;padding:2px 8px;border-radius:4px;font-size:0.8rem;">동일</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border); background:rgba(255,255,255,0.02);">
+            <td style="padding:0.7rem 1rem; color:var(--text)">언어 모델</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">Gemma-2B (PaliGemma)</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">Gemma-2B ✓ (독립 로드)</td>
+            <td style="padding:0.7rem 1rem;"><span style="background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;font-size:0.8rem;">유사</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:0.7rem 1rem; color:var(--text)">언어 통합</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">PaliGemma 통합 joint forward</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">[vis|text] concat → Gemma encoder ✓</td>
+            <td style="padding:0.7rem 1rem;"><span style="background:#14532d;color:#86efac;padding:2px 8px;border-radius:4px;font-size:0.8rem;">수정 완료</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border); background:rgba(255,255,255,0.02);">
+            <td style="padding:0.7rem 1rem; color:var(--text)">시각↔액션 joint attn</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">Action Expert가 VLM 토큰에 직접 cross-attend</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">FlowHead가 64 latent cond에 cross-attend</td>
+            <td style="padding:0.7rem 1rem;"><span style="background:#451a03;color:#fb923c;padding:2px 8px;border-radius:4px;font-size:0.8rem;">간접</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:0.7rem 1rem; color:var(--text)">사전학습 규모</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">10,000시간 · 7 로봇 · 68 태스크</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">단일 플랫폼 · 소규모 수집</td>
+            <td style="padding:0.7rem 1rem;"><span style="background:#4a1942;color:#e879f9;padding:2px 8px;border-radius:4px;font-size:0.8rem;">최대 격차</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border); background:rgba(255,255,255,0.02);">
+            <td style="padding:0.7rem 1rem; color:var(--text)">액션 공간</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">7DoF manipulation (manipulation)</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">(vx, vy, ωz) 모바일 내비게이션</td>
+            <td style="padding:0.7rem 1rem;"><span style="background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;font-size:0.8rem;">의도적</span></td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:0.7rem 1rem; color:var(--text)">ODE solver</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">50 step</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">Euler 5 step / Heun 5 step</td>
+            <td style="padding:0.7rem 1rem;"><span style="background:#14532d;color:#86efac;padding:2px 8px;border-radius:4px;font-size:0.8rem;">Jetson 최적화</span></td>
+          </tr>
+          <tr>
+            <td style="padding:0.7rem 1rem; color:var(--text)">파인튜닝 전략</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">VLM 고정 + Action Expert만 학습</td>
+            <td style="padding:0.7rem 1rem; color:var(--text-2)">전체 파라미터 학습 가능</td>
+            <td style="padding:0.7rem 1rem;"><span style="background:#1e3a5f;color:#93c5fd;padding:2px 8px;border-radius:4px;font-size:0.8rem;">유연</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── 수정된 버그: 언어 완전 무시 ── -->
+    <div style="background:#1a0a00; border:1px solid #f97316; border-left:4px solid #f97316; border-radius:8px; padding:1.5rem 1.75rem; margin-bottom:2rem;">
+      <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.75rem;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#f97316" stroke-width="1.5"/><path d="M8 4v4M8 11v1" stroke="#f97316" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span style="font-size:0.9rem; font-weight:600; color:#fb923c;">수정된 치명적 결함 — 언어 지시 완전 무시 (fix: ce7134f)</span>
+      </div>
+      <p style="color:var(--text-2); font-size:0.88rem; margin:0 0 0.75rem;">
+        기존 구현에서 <code style="color:#fb923c">text_input</code>은 <code>forward()</code>에 전달되었지만 내부에서 완전히 무시되었다.
+        Gemma-2B는 로드되었으나 호출되지 않았으며, 모든 언어 지시는 액션 conditioning에 아무 영향을 미치지 않았다.
+      </p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; font-size:0.82rem;">
+        <div>
+          <div style="color:#ef4444; margin-bottom:0.4rem; font-weight:600;">이전 (버그)</div>
+          <pre style="background:#0d0d0d; border:1px solid #ef4444; border-radius:6px; padding:0.75rem; color:#fca5a5; overflow-x:auto; margin:0;">def forward(self, images, text_input=None):
+    # text_input 완전 무시
+    visual_latents = self.resampler(vision_feats)
+    return visual_latents  # (B, 64, 2048)</pre>
+        </div>
+        <div>
+          <div style="color:#22c55e; margin-bottom:0.4rem; font-weight:600;">이후 (수정)</div>
+          <pre style="background:#0d0d0d; border:1px solid #22c55e; border-radius:6px; padding:0.75rem; color:#86efac; overflow-x:auto; margin:0;">def forward(self, images, text_input=None):
+    visual_latents = self.resampler(vision_feats)
+    # text 토크나이즈 후 concat
+    combined = cat([visual_latents, text_embeds])
+    out = gemma_encoder(combined)
+    return out[:, :64]  # 언어 grounded</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── π0 벤치마크 참고 수치 ── -->
+    <h3 style="margin:2rem 0 1rem; font-size:1.2rem; color:var(--text)">π0 벤치마크 — 우리의 목표 기준점</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:1rem; margin-bottom:2rem;">
+      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:1.25rem; text-align:center;">
+        <div style="font-size:1.8rem; font-weight:700; color:#86efac; font-variant-numeric:tabular-nums;">0.971</div>
+        <div style="font-size:0.82rem; color:var(--text-3); margin-top:0.3rem;">Bussing Easy<br/>성공률 (π0)</div>
+      </div>
+      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:1.25rem; text-align:center;">
+        <div style="font-size:1.8rem; font-weight:700; color:#93c5fd; font-variant-numeric:tabular-nums;">&gt;2×</div>
+        <div style="font-size:0.82rem; color:var(--text-3); margin-top:0.3rem;">π0 vs π0-small<br/>(470M, VLM 없음)</div>
+      </div>
+      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:1.25rem; text-align:center;">
+        <div style="font-size:1.8rem; font-weight:700; color:#c4b5fd; font-variant-numeric:tabular-nums;">50Hz</div>
+        <div style="font-size:0.82rem; color:var(--text-3); margin-top:0.3rem;">제어 빈도<br/>(Action Chunking)</div>
+      </div>
+      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:1.25rem; text-align:center;">
+        <div style="font-size:1.8rem; font-weight:700; color:#fb923c; font-variant-numeric:tabular-nums;">10K h</div>
+        <div style="font-size:0.82rem; color:var(--text-3); margin-top:0.3rem;">사전학습 데이터<br/>(7 로봇 플랫폼)</div>
+      </div>
+    </div>
+
+    <!-- ── 남은 격차와 해소 전략 ── -->
+    <h3 style="margin:2rem 0 1rem; font-size:1.2rem; color:var(--text)">남은 격차 &amp; 현실적 해소 전략</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:2rem;">
+      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:1.5rem;">
+        <div style="font-size:0.85rem; font-weight:600; color:#c4b5fd; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#a78bfa" stroke-width="1.2"/><path d="M5 7l2 2 4-4" stroke="#a78bfa" stroke-width="1.2" stroke-linecap="round"/></svg>
+          크로스-엠보디먼트 데이터 부재
+        </div>
+        <p style="font-size:0.83rem; color:var(--text-2); margin:0 0 0.75rem;">π0의 강점은 10K시간 다양한 로봇 데이터 사전학습. Jetson 로컬 수집만으로는 일반화 한계.</p>
+        <div style="font-size:0.82rem; color:var(--text-3); border-top:1px solid var(--border); padding-top:0.75rem;">
+          <strong style="color:var(--text)">해소 전략:</strong><br/>
+          Open-X Embodiment (856 태스크, 22M 스텝) 데이터셋 중 모바일 플랫폼 서브셋 활용.
+          백본 고정 + FlowHead만 모바일 데이터로 파인튜닝 (π0 논문의 Phase 2 전략과 동일).
+        </div>
+      </div>
+      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:1.5rem;">
+        <div style="font-size:0.85rem; font-weight:600; color:#fb923c; margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="#f97316" stroke-width="1.2"/><path d="M7 4v4M7 9.5v.5" stroke="#f97316" stroke-width="1.2" stroke-linecap="round"/></svg>
+          간접적인 VLM↔액션 어텐션
+        </div>
+        <p style="font-size:0.83rem; color:var(--text-2); margin:0 0 0.75rem;">π0의 Action Expert는 VLM 토큰에 직접 cross-attend. MoNa-π는 64 latent를 경유하는 간접 구조.</p>
+        <div style="font-size:0.82rem; color:var(--text-3); border-top:1px solid var(--border); padding-top:0.75rem;">
+          <strong style="color:var(--text)">해소 전략:</strong><br/>
+          FlowMatchingHead의 cross_attn key/value를 64 latent 대신 Gemma 전체 시퀀스(64+L)로 확장.
+          <code style="color:#fb923c; font-size:0.8rem;">cond_dim = 2048, n_tokens = 64+L</code> 로 변경 시
+          구현 비용 낮고 표현력 대폭 향상.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 아키텍처 진화 로드맵 ── -->
+    <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:1.5rem;">
+      <div style="font-size:0.9rem; font-weight:600; color:var(--text); margin-bottom:1rem;">π0 수렴 로드맵 — 3단계</div>
+      <div style="display:flex; flex-direction:column; gap:0.75rem;">
+        <div style="display:flex; align-items:flex-start; gap:1rem;">
+          <div style="min-width:28px; height:28px; background:#14532d; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:700; color:#86efac;">1</div>
+          <div>
+            <div style="font-size:0.88rem; font-weight:600; color:#86efac;">완료 — 언어 통합 수정 (ce7134f)</div>
+            <div style="font-size:0.82rem; color:var(--text-3);">text_input이 Gemma encoder를 통해 시각 conditioning에 실제로 반영됨. π0 핵심 설계와 동일.</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:flex-start; gap:1rem;">
+          <div style="min-width:28px; height:28px; background:#1e3a5f; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:700; color:#93c5fd;">2</div>
+          <div>
+            <div style="font-size:0.88rem; font-weight:600; color:#93c5fd;">다음 — FlowHead cross-attn 확장</div>
+            <div style="font-size:0.82rem; color:var(--text-3);">64 latent 대신 전체 Gemma 시퀀스를 FlowHead에 전달. 직접 VLM↔액션 어텐션 구현.</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:flex-start; gap:1rem;">
+          <div style="min-width:28px; height:28px; background:#2d1b6e; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.78rem; font-weight:700; color:#c4b5fd;">3</div>
+          <div>
+            <div style="font-size:0.88rem; font-weight:600; color:#c4b5fd;">장기 — Open-X 서브셋 사전학습</div>
+            <div style="font-size:0.82rem; color:var(--text-3);">모바일 플랫폼(Nav2 + 휠체어 로봇) 데이터로 백본 고정, FlowHead 사전학습 → 모바일 수집 데이터로 파인튜닝.</div>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
