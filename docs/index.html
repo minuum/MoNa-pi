@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MoNa-pi — Flow Matching 기반 모바일 내비게이션 VLA</title>
   <meta name="description" content="SigLIP + Gemma-2B + Flow Matching을 결합한 차세대 모바일 로봇 VLA 시스템" />
+  <!-- Open Graph -->
+  <meta property="og:title" content="MoNa-π — Flow Matching 기반 모바일 내비게이션 VLA" />
+  <meta property="og:description" content="SigLIP SO400M + Gemma-2B + Flow Matching. Jetson AGX 기반 10Hz 모바일 로봇 내비게이션." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://minuum.github.io/MoNa-pi/" />
+  <meta name="twitter:card" content="summary_large_image" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
@@ -273,6 +280,10 @@
     /* ── SCROLL FADE-IN ─────────────────── */
     .fade-in { opacity: 0; transform: translateY(20px); transition: opacity .5s, transform .5s; }
     .fade-in.visible { opacity: 1; transform: none; }
+
+    /* ── CODE STRUCTURE GRID ─────────────── */
+    .code-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1.5rem; }
+    @media (max-width: 600px) { .code-grid { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -574,6 +585,86 @@
   </div>
 </section>
 
+<!-- ════════════ CODE STRUCTURE ════════════ -->
+<section id="code">
+  <div class="container fade-in">
+    <p class="section-label">코드 구조</p>
+    <h2>프로젝트 디렉토리</h2>
+    <p class="section-intro">각 폴더는 파이프라인의 한 단계를 담당하며, 독립적으로 실행 가능합니다.</p>
+
+    <div class="code-grid">
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:var(--bg-soft); padding:.6rem 1rem; font-size:.75rem; font-weight:600; color:var(--text-3); letter-spacing:.05em; text-transform:uppercase; border-bottom:1px solid var(--border)">모델</div>
+        <div style="padding:.9rem 1rem; font-family:var(--mono); font-size:.8rem; line-height:2">
+          <span style="color:var(--accent)">models/</span><br/>
+          &nbsp;&nbsp;<span style="color:var(--text-3)">backbones/</span>  pi0_backbone.py<br/>
+          &nbsp;&nbsp;<span style="color:var(--text-3)">components/</span> resampler.py<br/>
+          &nbsp;&nbsp;<span style="color:var(--text-3)">heads/</span>      flow_head.py<br/>
+          &nbsp;&nbsp;pi0_core.py  <span style="color:var(--text-3); font-size:.72rem">← 메인 래퍼</span>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:var(--bg-soft); padding:.6rem 1rem; font-size:.75rem; font-weight:600; color:var(--text-3); letter-spacing:.05em; text-transform:uppercase; border-bottom:1px solid var(--border)">데이터</div>
+        <div style="padding:.9rem 1rem; font-family:var(--mono); font-size:.8rem; line-height:2">
+          <span style="color:var(--accent)">data/</span><br/>
+          &nbsp;&nbsp;preprocessing.py <span style="color:var(--text-3); font-size:.72rem">← Smoother·Prefix</span><br/>
+          &nbsp;&nbsp;dataset.py       <span style="color:var(--text-3); font-size:.72rem">← HDF5 v5/v6</span><br/>
+          <span style="color:var(--accent)">collect/</span><br/>
+          &nbsp;&nbsp;keyboard_collector.py<br/>
+          &nbsp;&nbsp;ros2_recorder.py
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:var(--bg-soft); padding:.6rem 1rem; font-size:.75rem; font-weight:600; color:var(--text-3); letter-spacing:.05em; text-transform:uppercase; border-bottom:1px solid var(--border)">학습 &amp; 평가</div>
+        <div style="padding:.9rem 1rem; font-family:var(--mono); font-size:.8rem; line-height:2">
+          <span style="color:var(--accent)">training/</span><br/>
+          &nbsp;&nbsp;train.py    <span style="color:var(--text-3); font-size:.72rem">← Cosine+Warmup LR</span><br/>
+          &nbsp;&nbsp;evaluate.py <span style="color:var(--text-3); font-size:.72rem">← Normalized MSE</span><br/>
+          <span style="color:var(--accent)">configs/</span><br/>
+          &nbsp;&nbsp;train.yaml  <span style="color:var(--text-3); font-size:.72rem">← 전체 하이퍼파라미터</span>
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:var(--bg-soft); padding:.6rem 1rem; font-size:.75rem; font-weight:600; color:var(--text-3); letter-spacing:.05em; text-transform:uppercase; border-bottom:1px solid var(--border)">추론 &amp; 로봇</div>
+        <div style="padding:.9rem 1rem; font-family:var(--mono); font-size:.8rem; line-height:2">
+          <span style="color:var(--accent)">inference/</span><br/>
+          &nbsp;&nbsp;engine.py     <span style="color:var(--text-3); font-size:.72rem">← 캐시 TTL 0.5s</span><br/>
+          &nbsp;&nbsp;server.py     <span style="color:var(--text-3); font-size:.72rem">← FastAPI REST</span><br/>
+          &nbsp;&nbsp;ode_solver.py <span style="color:var(--text-3); font-size:.72rem">← Euler·Heun·DPM</span><br/>
+          <span style="color:var(--accent)">robot/</span><br/>
+          &nbsp;&nbsp;action_buffer.py<br/>
+          &nbsp;&nbsp;ros2_controller.py
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 파라미터 분포 -->
+    <h3 style="margin-top:2.5rem; margin-bottom:1rem">모델 파라미터 구성</h3>
+    <div style="background:var(--bg-soft); border:1px solid var(--border); border-radius:var(--radius); padding:1.4rem; display:flex; flex-wrap:wrap; gap:1.5rem; align-items:center">
+      <div style="flex:1; min-width:200px">
+        <div style="font-size:.78rem; color:var(--text-3); margin-bottom:.3rem">SigLIP SO400M</div>
+        <div style="background:var(--accent); height:10px; border-radius:5px; width:42%; margin-bottom:.2rem"></div>
+        <div style="font-size:.8rem; font-weight:600">~400M params</div>
+      </div>
+      <div style="flex:1; min-width:200px">
+        <div style="font-size:.78rem; color:var(--text-3); margin-bottom:.3rem">Gemma-2B</div>
+        <div style="background:#3b82f6; height:10px; border-radius:5px; width:85%; margin-bottom:.2rem"></div>
+        <div style="font-size:.8rem; font-weight:600">~2,000M params</div>
+      </div>
+      <div style="flex:1; min-width:200px">
+        <div style="font-size:.78rem; color:var(--text-3); margin-bottom:.3rem">PerceiverResampler + FlowHead</div>
+        <div style="background:#93c5fd; height:10px; border-radius:5px; width:12%; margin-bottom:.2rem"></div>
+        <div style="font-size:.8rem; font-weight:600">~130M params</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ════════════ PIPELINE ════════════ -->
 <section id="pipeline">
   <div class="container-wide fade-in">
@@ -662,6 +753,38 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- RampController 설명 -->
+    <h3 style="margin-top:2.5rem; margin-bottom:1rem">키보드 가감속 제어 (RampController)</h3>
+    <div class="highlight-box">
+      <strong>Bang-bang 문제:</strong> 일반 키보드 수집은 키를 누르는 순간 최대 속도, 떼는 순간 0이 되는 불연속 신호를 만듭니다.
+      Flow Matching은 부드러운 궤적을 선호하므로 이런 스파이크는 학습 품질을 크게 저하시킵니다.
+      <code>RampController</code>는 이차 가속도를 적용해 <strong>0.5초에 최대 속도 1.15 도달, 0.15초 감속</strong>을 구현합니다.
+    </div>
+    <div style="background:var(--bg-soft); border:1px solid var(--border); border-radius:var(--radius); padding:1.2rem; margin-bottom:1.5rem">
+      <svg viewBox="0 0 580 120" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif" style="max-width:100%; display:block">
+        <!-- grid lines -->
+        <line x1="50" y1="20" x2="50" y2="95" stroke="#e5e7eb" stroke-width="1"/>
+        <line x1="50" y1="95" x2="540" y2="95" stroke="#e5e7eb" stroke-width="1"/>
+        <line x1="50" y1="30" x2="540" y2="30" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3,3"/>
+        <!-- labels -->
+        <text x="42" y="33" fill="#6b7280" font-size="9" text-anchor="end">1.15</text>
+        <text x="42" y="98" fill="#6b7280" font-size="9" text-anchor="end">0</text>
+        <text x="44" y="108" fill="#6b7280" font-size="9" text-anchor="end">t=0</text>
+        <text x="240" y="108" fill="#6b7280" font-size="9" text-anchor="middle">0.5s</text>
+        <text x="390" y="108" fill="#6b7280" font-size="9" text-anchor="middle">키 뗌</text>
+        <text x="480" y="108" fill="#6b7280" font-size="9" text-anchor="middle">0.65s</text>
+        <!-- Bang-bang: red -->
+        <polyline points="50,95 55,30 355,30 365,95 540,95" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,3" opacity="0.6"/>
+        <text x="200" y="24" fill="#ef4444" font-size="9" font-weight="600">기존 Bang-bang</text>
+        <!-- Ramp: blue -->
+        <path d="M50,95 Q170,95 240,30 L360,30 Q430,30 490,95 L540,95" fill="none" stroke="#2563eb" stroke-width="2.5"/>
+        <text x="200" y="50" fill="#2563eb" font-size="9" font-weight="600">RampController (이차 가속도)</text>
+        <!-- annotation -->
+        <text x="100" y="72" fill="#2563eb" font-size="8">이차 가속</text>
+        <text x="415" y="72" fill="#2563eb" font-size="8">0.15s 감속</text>
+      </svg>
     </div>
 
     <!-- 코드 예시 -->
@@ -899,7 +1022,7 @@
       </div>
       <div class="footer-links">
         <a href="https://github.com/minuum/MoNa-pi" target="_blank">GitHub</a>
-        <a href="docs/progress_2026_04_15.md">진행 현황</a>
+        <a href="https://github.com/minuum/MoNa-pi/blob/main/docs/progress_2026_04_15.md" target="_blank">진행 현황</a>
         <a href="https://www.pi.website/blog/pi0" target="_blank">π0 참고</a>
       </div>
     </div>
