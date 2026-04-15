@@ -300,6 +300,7 @@
     <li><a href="#pipeline">파이프라인</a></li>
     <li><a href="#results">검증</a></li>
     <li><a href="#roadmap">로드맵</a></li>
+    <li><a href="#transfer">도메인 이전</a></li>
   </ul>
   <a href="https://github.com/minuum/MoNa-pi" class="nav-gh" target="_blank">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
@@ -1006,6 +1007,232 @@
           <div class="road-label">정량 평가 및 논문 작성</div>
           <div class="road-desc">Normalized MSE, 실환경 성공률, MoNaVLA 대비 비교 실험</div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════ DOMAIN TRANSFER ════════════ -->
+<section id="transfer">
+  <div class="container fade-in">
+    <p class="section-label">도메인 이전 가능성</p>
+    <h2>다른 로봇·태스크로 이식하려면?</h2>
+    <p class="section-intro">
+      MoNa-π 아키텍처는 내비게이션을 위해 설계됐지만, 핵심 컴포넌트는 도메인에 무관합니다.
+      어떤 부분이 재사용 가능하고 어디를 교체해야 하는지 컴포넌트별로 분석합니다.
+    </p>
+
+    <!-- ── 컴포넌트 이전 난이도 표 ── -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>컴포넌트</th><th>파일</th><th>이전 난이도</th><th>무엇을 바꾸나</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>SigLIP SO400M</strong></td>
+            <td><code>models/backbones/pi0_backbone.py</code></td>
+            <td><span class="badge badge-green">🟢 재사용</span></td>
+            <td>변경 없음. 사전학습 시각 표현은 완전히 도메인 독립적</td>
+          </tr>
+          <tr>
+            <td><strong>Gemma-2B</strong></td>
+            <td><code>models/backbones/pi0_backbone.py</code></td>
+            <td><span class="badge badge-green">🟢 재사용</span></td>
+            <td>변경 없음. 언어 이해 능력은 어떤 언어 명령에도 적용</td>
+          </tr>
+          <tr>
+            <td><strong>PerceiverResampler</strong></td>
+            <td><code>models/components/resampler.py</code></td>
+            <td><span class="badge badge-green">🟢 재사용</span></td>
+            <td>변경 없음. 64토큰 압축 구조는 도메인에 무관</td>
+          </tr>
+          <tr>
+            <td><strong>FlowMatchingHead</strong></td>
+            <td><code>models/heads/flow_head.py</code></td>
+            <td><span class="badge badge-green">🟢 config 1줄</span></td>
+            <td><code>action_dim: 3 → 7</code>만 변경. Transformer 구조 전체 재사용</td>
+          </tr>
+          <tr>
+            <td><strong>ODE Solvers</strong></td>
+            <td><code>inference/ode_solver.py</code></td>
+            <td><span class="badge badge-green">🟢 재사용</span></td>
+            <td>변경 없음. 수치 적분은 액션 차원에 무관</td>
+          </tr>
+          <tr>
+            <td><strong>ActionSmoother</strong></td>
+            <td><code>data/preprocessing.py</code></td>
+            <td><span class="badge badge-green">🟢 재사용</span></td>
+            <td>Savitzky-Golay는 임의 차원 시계열에 적용 가능</td>
+          </tr>
+          <tr>
+            <td><strong>ActionNormalizer</strong></td>
+            <td><code>data/preprocessing.py</code></td>
+            <td><span class="badge badge-blue">🔵 범위 수정</span></td>
+            <td><code>min_val / max_val</code> 와 <code>action_dim</code> 을 새 도메인에 맞게 조정</td>
+          </tr>
+          <tr>
+            <td><strong>IntentPrefixInjector</strong></td>
+            <td><code>data/preprocessing.py</code></td>
+            <td><span class="badge badge-orange">🟡 어휘 교체</span></td>
+            <td>9-class 내비게이션 레이블(FORWARD/TURN…)을 새 도메인 어휘(GRASP/PLACE…)로 교체</td>
+          </tr>
+          <tr>
+            <td><strong>CounterfactualInjector</strong></td>
+            <td><code>data/preprocessing.py</code></td>
+            <td><span class="badge badge-orange">🟡 로직 수정</span></td>
+            <td>stop/steer 오버라이드 로직을 새 도메인 실패 모드로 교체</td>
+          </tr>
+          <tr>
+            <td><strong>ActionChunkBuffer</strong></td>
+            <td><code>robot/action_buffer.py</code></td>
+            <td><span class="badge badge-green">🟢 재사용</span></td>
+            <td>변경 없음. Receding Horizon 버퍼 구조는 도메인 독립</td>
+          </tr>
+          <tr>
+            <td><strong>ros2_controller.py</strong></td>
+            <td><code>robot/ros2_controller.py</code></td>
+            <td><span class="badge badge-orange">🟡 인터페이스 교체</span></td>
+            <td><code>geometry_msgs/Twist</code> → 새 메시지 타입 (JointState, PoseStamped 등)</td>
+          </tr>
+          <tr>
+            <td><strong>keyboard_collector.py</strong></td>
+            <td><code>collect/keyboard_collector.py</code></td>
+            <td><span class="badge badge-red" style="background:#fee2e2;color:#dc2626">🔴 재작성</span></td>
+            <td>모바일 특화 키맵. 조작 로봇은 SpaceMouse/joystick 텔레오퍼레이션으로 대체 필요</td>
+          </tr>
+          <tr>
+            <td><strong>학습 데이터</strong></td>
+            <td><code>configs/train.yaml → data.train_path</code></td>
+            <td><span class="badge badge-red" style="background:#fee2e2;color:#dc2626">🔴 재수집</span></td>
+            <td>새 도메인 시연 데이터 필요. 백본은 재사용하고 FlowHead만 fine-tune 가능</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── 이전 시나리오 카드 ── -->
+    <h3 style="margin-top:2.5rem; margin-bottom:1.2rem">구체적 이전 시나리오</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:1rem">
+
+      <div style="border:1.5px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#eff6ff; padding:.75rem 1.1rem; border-bottom:1px solid #bfdbfe">
+          <div style="font-size:.72rem; font-weight:700; color:var(--accent); letter-spacing:.05em; text-transform:uppercase">난이도 낮음</div>
+          <div style="font-weight:700; font-size:1rem; margin-top:.2rem">2-휠 차동구동 로봇</div>
+          <div style="font-size:.8rem; color:var(--text-3)">Turtlebot, Clearpath Husky</div>
+        </div>
+        <div style="padding:1rem 1.1rem; font-size:.83rem; line-height:1.9; color:var(--text-2)">
+          <div>현재 3D 액션에서 <code>linear_y</code> 제거</div>
+          <div style="margin:.4rem 0; padding:.4rem .7rem; background:var(--bg-soft); border-radius:5px; font-family:var(--mono); font-size:.78rem"><span style="color:#c084fc">action_dim</span>: <span style="color:#fb923c">2</span>  <span style="color:#64748b"># lx, az</span></div>
+          <div>IntentPrefix에서 STRAFE 클래스 제거</div>
+          <div style="margin-top:.6rem; font-size:.78rem; color:var(--green); font-weight:600">✓ 거의 모든 코드 재사용 가능</div>
+        </div>
+      </div>
+
+      <div style="border:1.5px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#fff7ed; padding:.75rem 1.1rem; border-bottom:1px solid #fed7aa">
+          <div style="font-size:.72rem; font-weight:700; color:var(--orange); letter-spacing:.05em; text-transform:uppercase">난이도 중간</div>
+          <div style="font-weight:700; font-size:1rem; margin-top:.2rem">드론 내비게이션</div>
+          <div style="font-size:.8rem; color:var(--text-3)">PX4, ArduPilot, MAVLink</div>
+        </div>
+        <div style="padding:1rem 1.1rem; font-size:.83rem; line-height:1.9; color:var(--text-2)">
+          <div>6D 액션 (pos + yaw 속도)</div>
+          <div style="margin:.4rem 0; padding:.4rem .7rem; background:var(--bg-soft); border-radius:5px; font-family:var(--mono); font-size:.78rem"><span style="color:#c084fc">action_dim</span>: <span style="color:#fb923c">4</span>  <span style="color:#64748b"># vx,vy,vz,yaw</span></div>
+          <div>ROS2 토픽 → <code>/mavros/setpoint_velocity</code></div>
+          <div>고도 정보 위한 depth cam 추가 권장</div>
+          <div style="margin-top:.6rem; font-size:.78rem; color:var(--orange); font-weight:600">⚠ 안전 제약 추가 필요</div>
+        </div>
+      </div>
+
+      <div style="border:1.5px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#fdf4ff; padding:.75rem 1.1rem; border-bottom:1px solid #e9d5ff">
+          <div style="font-size:.72rem; font-weight:700; color:#7c3aed; letter-spacing:.05em; text-transform:uppercase">난이도 높음 · 고가치</div>
+          <div style="font-weight:700; font-size:1rem; margin-top:.2rem">7DoF 로봇 팔 조작</div>
+          <div style="font-size:.8rem; color:var(--text-3)">Franka, UR5, Kinova</div>
+        </div>
+        <div style="padding:1rem 1.1rem; font-size:.83rem; line-height:1.9; color:var(--text-2)">
+          <div>EE 델타 포즈 또는 관절 각도</div>
+          <div style="margin:.4rem 0; padding:.4rem .7rem; background:var(--bg-soft); border-radius:5px; font-family:var(--mono); font-size:.78rem"><span style="color:#c084fc">action_dim</span>: <span style="color:#fb923c">7</span>  <span style="color:#64748b"># Δx,y,z,rx,ry,rz,grip</span></div>
+          <div>IntentPrefix → GRASP / PLACE / WIPE …</div>
+          <div>SpaceMouse 텔레오퍼레이션으로 수집</div>
+          <div style="margin-top:.6rem; font-size:.78rem; color:#7c3aed; font-weight:600">★ π0 원본 설계 의도와 일치</div>
+        </div>
+      </div>
+
+      <div style="border:1.5px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#f0fdf4; padding:.75rem 1.1rem; border-bottom:1px solid #bbf7d0">
+          <div style="font-size:.72rem; font-weight:700; color:var(--green); letter-spacing:.05em; text-transform:uppercase">환경 이전 (동일 로봇)</div>
+          <div style="font-weight:700; font-size:1rem; margin-top:.2rem">새 환경 Fine-tuning</div>
+          <div style="font-size:.8rem; color:var(--text-3)">실내 → 실외 / 다른 건물</div>
+        </div>
+        <div style="padding:1rem 1.1rem; font-size:.83rem; line-height:1.9; color:var(--text-2)">
+          <div>코드 변경 <strong>0줄</strong></div>
+          <div>백본 동결 (frozen) + FlowHead만 fine-tune</div>
+          <div style="margin:.4rem 0; padding:.4rem .7rem; background:var(--bg-soft); border-radius:5px; font-family:var(--mono); font-size:.78rem"><span style="color:#60a5fa">pretrain</span>:<br/>&nbsp;&nbsp;<span style="color:#c084fc">ckpt_path</span>: <span style="color:#86efac">"checkpoints/best"</span></div>
+          <div>새 환경 ~50 에피소드만 수집해도 적응 가능 (예상)</div>
+          <div style="margin-top:.6rem; font-size:.78rem; color:var(--green); font-weight:600">✓ 가장 현실적인 단기 계획</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 7DoF 이전 최소 변경 코드 ── -->
+    <h3 style="margin-top:2.5rem; margin-bottom:.75rem">7DoF 조작 이전 — 최소 변경 diff</h3>
+    <div class="highlight-box">
+      <strong>핵심 인사이트:</strong> <code>FlowMatchingHead</code>는 <code>action_dim</code> 파라미터 하나로 임의의 차원에 즉시 적용됩니다.
+      백본(SigLIP + Gemma-2B)은 변경 없이 완전히 재사용됩니다.
+      가장 큰 장벽은 코드가 아니라 <strong>새 도메인의 시연 데이터 수집</strong>입니다.
+    </div>
+    <pre><span class="token-cmt"># configs/train.yaml — 변경 3줄로 7DoF 조작 도메인 이전</span>
+
+model:
+<span style="background:#1e3a1e; display:block; margin:0 -1.5rem; padding:0 1.5rem">+  <span class="token-kw">action_dim</span>: <span class="token-num">7</span>     <span class="token-cmt"># Δx, Δy, Δz, Δrx, Δry, Δrz, gripper</span></span>
+<span style="background:#3a1e1e; display:block; margin:0 -1.5rem; padding:0 1.5rem">-  <span class="token-kw">action_dim</span>: <span class="token-num">3</span>     <span class="token-cmt"># vx, vy, angular_z (내비게이션)</span></span>
++  <span class="token-kw">horizon</span>: <span class="token-num">20</span>       <span class="token-cmt"># 조작은 더 긴 horizon 권장</span>
+-  <span class="token-kw">horizon</span>: <span class="token-num">10</span>
+
+data:
++  <span class="token-kw">train_path</span>: <span class="token-str">/data/franka_episodes/</span>
+-  <span class="token-kw">train_path</span>: <span class="token-str">/data/mobile_vla_dataset_v5/</span>
+
+<span class="token-cmt"># data/preprocessing.py — IntentPrefixInjector 어휘만 교체</span>
+INTENT_LABELS = [
+<span style="background:#1e3a1e; display:block; margin:0 -1.5rem; padding:0 1.5rem">+    <span class="token-str">"REACH"</span>, <span class="token-str">"GRASP"</span>, <span class="token-str">"PLACE"</span>, <span class="token-str">"PUSH"</span>, <span class="token-str">"PULL"</span>, <span class="token-str">"WIPE"</span>, <span class="token-str">"OPEN"</span>, <span class="token-str">"CLOSE"</span>, <span class="token-str">"STOP"</span>,</span>
+<span style="background:#3a1e1e; display:block; margin:0 -1.5rem; padding:0 1.5rem">-    <span class="token-str">"FORWARD"</span>, <span class="token-str">"BACKWARD"</span>, <span class="token-str">"TURN_LEFT"</span>, <span class="token-str">"TURN_RIGHT"</span>, ... (내비게이션 9-class)</span>
+]
+
+<span class="token-cmt"># robot/ros2_controller.py — 퍼블리시 메시지 타입만 교체</span>
+<span style="background:#1e3a1e; display:block; margin:0 -1.5rem; padding:0 1.5rem">+ from <span class="token-kw">franka_msgs.msg</span> import <span class="token-fn">JointCommand</span>
++   msg.position = action_chunk[<span class="token-num">0</span>]   <span class="token-cmt"># 관절 각도 목표값</span></span>
+<span style="background:#3a1e1e; display:block; margin:0 -1.5rem; padding:0 1.5rem">- from <span class="token-kw">geometry_msgs.msg</span> import <span class="token-fn">Twist</span>
+-   msg.linear.x = action[<span class="token-num">0</span>]         <span class="token-cmt"># 내비게이션 속도</span></span>
+</pre>
+
+    <!-- ── 전략 요약 ── -->
+    <h3 style="margin-top:2rem; margin-bottom:1rem">이전 전략 요약</h3>
+    <div class="results-grid">
+      <div class="result-card">
+        <div class="rc-icon">🔵</div>
+        <div class="rc-title">고정 (변경 불필요)</div>
+        <div class="rc-val" style="font-size:1rem; color:var(--text)">SigLIP · Gemma-2B · Resampler · ODE Solvers · ActionBuffer</div>
+        <div class="rc-sub">전체 파라미터의 ~95% 재사용</div>
+      </div>
+      <div class="result-card">
+        <div class="rc-icon">🔵</div>
+        <div class="rc-title">Config 1줄 (파라미터 변경)</div>
+        <div class="rc-val" style="font-size:1rem; color:var(--text)">action_dim · horizon · train_path · normalizer bounds</div>
+        <div class="rc-sub">FlowMatchingHead 구조 자동 적응</div>
+      </div>
+      <div class="result-card">
+        <div class="rc-icon">🟡</div>
+        <div class="rc-title">소규모 코드 수정</div>
+        <div class="rc-val" style="font-size:1rem; color:var(--text)">IntentPrefix 어휘 · ROS2 메시지 타입</div>
+        <div class="rc-sub">~100줄 이내 수정으로 완료 가능</div>
+      </div>
+      <div class="result-card">
+        <div class="rc-icon">🔴</div>
+        <div class="rc-title">재작성 / 재수집 필요</div>
+        <div class="rc-val" style="font-size:1rem; color:var(--text)">데이터 수집 스크립트 · 시연 데이터셋</div>
+        <div class="rc-sub">새 도메인 50~500 에피소드가 진짜 장벽</div>
       </div>
     </div>
   </div>
