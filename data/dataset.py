@@ -32,19 +32,34 @@ def _detect_format(h5file: h5py.File) -> str:
     raise ValueError(f"지원하지 않는 HDF5 구조: {list(h5file.keys())}")
 
 
+def _read_instruction(h5file: h5py.File, fmt: str) -> str:
+    """
+    v5: language_instruction 은 dataset (shape (1,), dtype object)
+    v3: task 는 attrs
+    """
+    if fmt == "v5":
+        if "language_instruction" in h5file:
+            raw = h5file["language_instruction"][0]
+        else:
+            raw = h5file.attrs.get("language_instruction", "Navigate to the goal")
+    else:
+        raw = h5file.attrs.get("task", "Navigate to the goal")
+
+    if isinstance(raw, bytes):
+        return raw.decode("utf-8")
+    return str(raw)
+
+
 def _read_episode(h5file: h5py.File, fmt: str):
     """포맷에 맞게 images, actions, instruction 읽기"""
     if fmt == "v5":
         images = h5file["observations/images"][:]   # (T, H, W, 3)
         actions = h5file["actions"][:]              # (T, 3)
-        instr = h5file.attrs.get("language_instruction", "Navigate to the goal")
     else:  # v3
         images = h5file["images"][:]
         actions = h5file["actions"][:]
-        instr = h5file.attrs.get("task", "Navigate to the goal")
 
-    if isinstance(instr, bytes):
-        instr = instr.decode("utf-8")
+    instr = _read_instruction(h5file, fmt)
     return images, actions.astype(np.float32), instr
 
 

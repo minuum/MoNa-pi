@@ -48,8 +48,13 @@ class Pi0VLA(nn.Module):
 
     def compute_loss(self, images, instructions, actions_gt):
         """
-        Training loss computation
+        Training loss computation.
+        Auto-casts inputs to model dtype so fp32 DataLoader tensors work
+        seamlessly with the fp16 model.
         """
+        model_dtype = next(self.parameters()).dtype
+        images = images.to(dtype=model_dtype)
+        actions_gt = actions_gt.to(dtype=model_dtype)
         cond = self.forward_backbone(images, instructions)
         loss = self.flow_head.get_loss(actions_gt, cond)
         return loss
@@ -59,8 +64,10 @@ class Pi0VLA(nn.Module):
         """
         ODE Solver (Heun's method)를 이용한 액션 샘플링
         """
+        model_dtype = next(self.parameters()).dtype
+        images = images.to(dtype=model_dtype)
         device = images.device
-        dtype = images.dtype
+        dtype = model_dtype
         cond = self.forward_backbone(images, instructions)
         B = cond.shape[0]
         
