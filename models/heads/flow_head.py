@@ -10,11 +10,18 @@ class SinusoidalPosEmb(nn.Module):
         self.dim = dim
 
     def forward(self, x):
+        # Ensure x is at least 1D (Batch dimension)
+        if x.ndim == 0:
+            x = x.unsqueeze(0)
+        if x.ndim == 2:
+            x = x.squeeze(-1)
+            
         device = x.device
+        dtype = x.dtype
         half_dim = self.dim // 2
         emb = math.log(10000) / (half_dim - 1)
-        emb = torch.exp(torch.arange(half_dim, device=device) * -emb)
-        emb = x[:, None] * emb[None, :]
+        emb = torch.exp(torch.arange(half_dim, device=device, dtype=dtype) * -emb)
+        emb = x.unsqueeze(-1) * emb.unsqueeze(0)
         emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
         return emb
 
@@ -112,8 +119,9 @@ class FlowMatchingHead(nn.Module):
         """
         B = x_1.shape[0]
         device = x_1.device
+        dtype = x_1.dtype
         
-        t = torch.rand(B, 1, device=device)
+        t = torch.rand(B, 1, device=device, dtype=dtype)
         x_0 = torch.randn_like(x_1)
         
         # x_t = (1-t)x_0 + t*x_1

@@ -1,90 +1,88 @@
 import torch
 import torch.nn as nn
+from .backbones.pi0_backbone import Pi0Backbone
 from .heads.flow_head import FlowMatchingHead
 
 class Pi0VLA(nn.Module):
     """
-    MoNa-pi Main Model Wrapper
+    MoNa-pi Main Model Wrapper (Original pi0 Spec)
     """
     def __init__(
         self,
-        backbone,           # Pre-trained VLM
-        resampler=None,     # Optional Perceiver Resampler
         action_dim=3,
-        horizon=10,         # Chunk size 10 (99% certainty)
+        horizon=10,
         hidden_dim=512,
+        vision_model_id="google/siglip-so400m-patch14-384",
+        lang_model_id="google/gemma-2b",
         **kwargs
     ):
         super().__init__()
-        self.backbone = backbone
-        self.resampler = resampler
         
-        backbone_out_dim = kwargs.get("backbone_out_dim", 1024)
+        # 1. Real pi0 Backbone (SigLIP + Gemma + Resampler)
+        self.backbone = Pi0Backbone(
+            vision_model_id=vision_model_id,
+            lang_model_id=lang_model_id
+        )
         
+        self.backbone_out_dim = self.backbone.lang_hidden_size # e.g., 2048
+        
+        # 2. Flow Matching Head
         self.flow_head = FlowMatchingHead(
-            input_dim=backbone_out_dim,
+            input_dim=self.backbone_out_dim,
             action_dim=action_dim,
             horizon=horizon,
             hidden_dim=hidden_dim
         )
+        
+        # 3. Ensure all components are in half precision for Jetson AGX
+        self.half()
 
     def forward_backbone(self, images, instructions):
         """
-        VLM Backbone을 통해 시각-언어 레이턴트 추출 (e.g. Kosmos-2)
         images: (B, Window, C, H, W)
         """
-        B, W, C, H, W_img = images.shape
-        # TODO: 실제 백본 통합 로직 (e.g. 8개 영상을 각각 혹은 통합하여 처리)
-        # 현재는 Placeholder로 64개의 토큰(Perceiver Resampler 결과 형태) 반환
-        device = images.device
-        return torch.randn(B, 64, self.flow_head.input_dim, device=device)
+        # pi0-style: Pass images through SigLIP -> Resampler -> Gemma
+        # instructions are handled inside backbone or as prefix
+        cond = self.backbone(images, instructions)
+        return cond # (B, 64, 2048)
 
     def compute_loss(self, images, instructions, actions_gt):
         """
-        Training loss 계산
+        Training loss computation
         """
         cond = self.forward_backbone(images, instructions)
         loss = self.flow_head.get_loss(actions_gt, cond)
         return loss
 
     @torch.no_grad()
-    def sample_actions(self, images, instructions, n_steps=5, solver='heun'):
+    def sample_actions(self, images, instructions, n_steps=5):
         """
-        Inference: ODE Solver (Euler or Heun)를 사용한 액션 샘플링
+        ODE Solver (Heun's method)를 이용한 액션 샘플링
         """
-        B = images.shape[0]
         device = images.device
-        horizon = self.flow_head.horizon
-        action_dim = self.flow_head.action_dim
-        
-        # 1. Feature Extraction
+        dtype = images.dtype
         cond = self.forward_backbone(images, instructions)
+        B = cond.shape[0]
         
-        # 2. Noise Initial State x_0 ~ N(0, I)
-        x_t = torch.randn(B, horizon, action_dim, device=device)
+        # 1. 초기 노이즈 (x_0 ~ N(0, I))
+        x_t = torch.randn(B, self.flow_head.horizon, self.flow_head.action_dim, device=device, dtype=dtype)
         
-        # 3. ODE Integration
-        dt = 1.0 / n_steps
-        
+        # 2. Heun's Method Solver
         for i in range(n_steps):
             t_curr = (i / n_steps)
-            t = torch.ones(B, 1, device=device) * t_curr
+            t_next = ((i + 1) / n_steps)
+            dt = t_next - t_curr
             
-            if solver == 'euler':
-                v_t = self.flow_head(x_t, t, cond)
-                x_t = x_t + v_t * dt
-            elif solver == 'heun':
-                # Heun's method (2nd order ODE solver)
-                v_t = self.flow_head(x_t, t, cond)
-                
-                t_next = (i + 1) / n_steps
-                t_next_tensor = torch.ones(B, 1, device=device) * t_next
-                
-                x_next_euler = x_t + v_t * dt
-                v_t_next = self.flow_head(x_next_euler, t_next_tensor, cond)
-                
-                x_t = x_t + 0.5 * (v_t + v_t_next) * dt
-            else:
-                raise ValueError(f"Unknown solver: {solver}")
+            t_curr_tensor = torch.full((B,), t_curr, device=device, dtype=dtype)
+            v_t = self.flow_head(x_t, t_curr_tensor, cond)
             
-        return x_t # Final actions x_1
+            # Predict x_next
+            x_next_approx = x_t + v_t * dt
+            
+            # Correction step
+            t_next_tensor = torch.full((B,), t_next, device=device, dtype=dtype)
+            v_t_next = self.flow_head(x_next_approx, t_next_tensor, cond)
+            
+            x_t = x_t + (v_t + v_t_next) * 0.5 * dt
+            
+        return x_t

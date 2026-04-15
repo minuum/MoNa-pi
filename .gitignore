@@ -35,3 +35,4 @@ checkpoints/
 *.ckpt
 *.pth
 *.safetensors
+.env

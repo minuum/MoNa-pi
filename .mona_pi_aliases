@@ -1,0 +1,252 @@
+# ============================================================
+# MoNa-pi Aliases Extension
+# 기존 vla-* 명령어를 --pi 파라미터로 MoNa-pi와 공유
+#
+# 규칙:
+#   vla-<cmd>          → 기존 MoNaVLA 동작 유지 (변경 없음)
+#   vla-<cmd> --pi ... → MoNa-pi 경로/스크립트로 분기
+#
+# Source 순서: .zshrc 맨 끝, .vla_aliases 이후에 로드되어야 함
+# ============================================================
+
+export MONA_PI_ROOT="/home/soda/MoNa-pi"
+
+# ── 1. vla-cd ────────────────────────────────────────────────────────────────
+# 기존: cd $VLA_PROJECT_DIR (MoNaVLA)
+# --pi: cd $MONA_PI_ROOT
+unalias vla-cd 2>/dev/null; unalias mona-cd 2>/dev/null
+vla-cd() {
+    if [[ "$1" == "--pi" ]]; then
+        cd "$MONA_PI_ROOT"
+    else
+        cd "${VLA_PROJECT_DIR:-/home/soda/MoNaVLA}"
+    fi
+}
+alias mona-cd='vla-cd'
+
+# ── 2. vla-collect ───────────────────────────────────────────────────────────
+# 기존: gradio_data_collector.py (MoNaVLA)
+# --pi [args]: keyboard_collector.py (MoNa-pi, Ramp 가감속)
+unalias vla-collect 2>/dev/null; unalias mona-collect 2>/dev/null
+vla-collect() {
+    if [[ "$1" == "--pi" ]]; then
+        shift
+        echo "[MoNa-pi] 키보드 수집기 시작 (Ramp 가감속)"
+        cd "$MONA_PI_ROOT" && python3 -m collect.keyboard_collector "$@"
+    else
+        python3 /home/soda/MoNaVLA/scripts/gradio_data_collector.py "$@"
+    fi
+}
+alias mona-collect='vla-collect'
+
+# --pi ROS2 버전 (ROS2 토픽 레코더)
+vla-collect-ros() {
+    if [[ "$1" == "--pi" ]]; then
+        shift
+        echo "[MoNa-pi] ROS2 토픽 레코더 시작"
+        cd "$MONA_PI_ROOT" && python3 collect/ros2_recorder.py "$@"
+    else
+        # 기존: ROS2 setup + gradio collector
+        source /home/soda/MoNaVLA/ROS_action/install/setup.zsh 2>/dev/null
+        python3 /home/soda/MoNaVLA/scripts/gradio_data_collector.py "$@"
+    fi
+}
+
+# ── 3. vla-server ────────────────────────────────────────────────────────────
+# 기존: MoNaVLA inference_server (FastAPI, Kosmos-2 모델)
+# --pi [args]: MoNa-pi inference/server.py (FastAPI, Flow Matching)
+unalias vla-server 2>/dev/null
+vla-server() {
+    if [[ "$1" == "--pi" ]]; then
+        shift
+        echo "[MoNa-pi] 추론 서버 시작 (Flow Matching, FastAPI)"
+        cd "$MONA_PI_ROOT" && python3 inference/server.py "$@"
+    else
+        cd "${VLA_ROOT:-/home/soda/MoNaVLA}"
+        python3 robovlm_nav/serve/api_server.py "$@"
+    fi
+}
+
+# ── 4. vla-inference ─────────────────────────────────────────────────────────
+# 기존: ROS2 api_client_node (MoNaVLA 클라이언트)
+# --pi [args]: ROS2 ros2_controller.py (MoNa-pi 컨트롤러)
+unalias vla-inference 2>/dev/null
+vla-inference() {
+    if [[ "$1" == "--pi" ]]; then
+        shift
+        echo "[MoNa-pi] ROS2 컨트롤러 노드 시작"
+        source /opt/ros/humble/setup.bash 2>/dev/null
+        cd "$MONA_PI_ROOT" && python3 robot/ros2_controller.py "$@"
+    else
+        vla-load-env 2>/dev/null
+        export VLA_LOCAL_MODEL=false
+        ros2 run mobile_vla_package api_client_node "$@"
+    fi
+}
+
+# ── 5. vla-train ─────────────────────────────────────────────────────────────
+# 기존: (없음 — MoNaVLA 학습은 별도 python 명령)
+# --pi [args]: MoNa-pi 학습 루프 (train.py + configs/train.yaml)
+# 파라미터 없으면 사용법 출력
+vla-train() {
+    if [[ "$1" == "--pi" ]]; then
+        shift
+        CONFIG="${1:-configs/train.yaml}"
+        echo "[MoNa-pi] 학습 시작: $CONFIG"
+        cd "$MONA_PI_ROOT" && python3 training/train.py --config "$CONFIG"
+    else
+        echo "사용법:"
+        echo "  vla-train --pi [configs/train.yaml]   MoNa-pi 학습"
+        echo "  MoNaVLA 학습은 별도 스크립트를 사용하세요"
+        echo "    cd /home/soda/MoNaVLA && python3 robovlm_nav/train.py configs/<config>.json"
+    fi
+}
+
+# ── 6. vla-eval ──────────────────────────────────────────────────────────────
+# --pi: MoNa-pi 오프라인 평가
+vla-eval() {
+    if [[ "$1" == "--pi" ]]; then
+        shift
+        CKPT="${1:-checkpoints/best}"
+        echo "[MoNa-pi] 오프라인 평가: $CKPT"
+        cd "$MONA_PI_ROOT" && python3 training/evaluate.py --config configs/train.yaml --ckpt "$CKPT"
+    else
+        echo "사용법: vla-eval --pi [checkpoints/best]"
+    fi
+}
+
+# ── 7. vla-analyze ───────────────────────────────────────────────────────────
+# 기존: gradio_offline_h5_analyzer.py (MoNaVLA)
+# --pi: scripts/analyze_actions.py (MoNa-pi 액션 분포 히스토그램)
+unalias vla-analyze 2>/dev/null
+vla-analyze() {
+    if [[ "$1" == "--pi" ]]; then
+        shift
+        echo "[MoNa-pi] 액션 분포 분석"
+        cd "$MONA_PI_ROOT" && python3 scripts/analyze_actions.py "$@"
+    else
+        python3 /home/soda/MoNaVLA/scripts/gradio_offline_h5_analyzer.py "$@"
+    fi
+}
+
+# ── 8. vla-env ───────────────────────────────────────────────────────────────
+# 기존: MoNaVLA 환경 변수 출력
+# --pi: MoNa-pi 환경 변수 출력
+_vla_env_original() {
+    echo "=========================================="
+    echo "MoNaVLA Environment Variables"
+    echo "=========================================="
+    echo "  Hostname        = $(hostname)"
+    echo "  Role            = ${VLA_SERVER_ROLE:-unknown}"
+    echo "  VLA_PROJECT_DIR = ${VLA_PROJECT_DIR:-/home/soda/MoNaVLA}"
+    echo "  API Server      = ${VLA_API_SERVER:-N/A}"
+    echo "  API Key         = ${VLA_API_KEY:0:20}..."
+    [ -n "$ROS_DOMAIN_ID" ] && echo "  ROS_DOMAIN_ID   = $ROS_DOMAIN_ID"
+}
+unalias vla-env 2>/dev/null
+vla-env() {
+    if [[ "$1" == "--pi" ]]; then
+        echo "=========================================="
+        echo "MoNa-pi Environment"
+        echo "=========================================="
+        echo "  MONA_PI_ROOT  = $MONA_PI_ROOT"
+        echo "  Python        = $(python3 --version 2>&1)"
+        echo "  CUDA          = $(python3 -c 'import torch; print(torch.cuda.get_device_name(0))' 2>/dev/null || echo 'N/A')"
+        echo "  Dataset v5    = /home/soda/MoNaVLA/ROS_action/mobile_vla_dataset_v5/"
+        echo "  Config        = $MONA_PI_ROOT/configs/train.yaml"
+        echo "  Inference     = http://localhost:8080"
+        echo "=========================================="
+    else
+        _vla_env_original
+    fi
+}
+alias mona-env='vla-env'
+
+# ── 9. vla-close ─────────────────────────────────────────────────────────────
+# 기존: MoNaVLA 프로세스 종료
+# --pi: MoNa-pi 프로세스도 함께 종료 (서버, 컨트롤러 포함)
+unalias vla-close 2>/dev/null
+vla-close() {
+    if [[ "$1" == "--pi" ]]; then
+        echo "[MoNa-pi] 프로세스 종료 중..."
+        pkill -f "inference/server.py"   2>/dev/null
+        pkill -f "robot/ros2_controller" 2>/dev/null
+        pkill -f "collect/keyboard_collector" 2>/dev/null
+        echo "MoNa-pi 프로세스 종료 완료"
+    else
+        pkill -f "gradio_inference_dashboard.py|mobile_vla|simple_robot_mover|camera_service_server|vla_inference|scripts/.*_inference.*\.py" 2>/dev/null
+        pkill -9 -f "ros2 run" 2>/dev/null
+        echo "VLA 프로세스 종료 완료"
+        fuser -k -9 /dev/video* 2>/dev/null
+    fi
+}
+
+# ── 10. vla-help ─────────────────────────────────────────────────────────────
+# 기존: MoNaVLA 도움말
+# --pi: MoNa-pi 명령어 도움말 추가 출력
+unalias vla-help 2>/dev/null
+vla-help() {
+    if [[ "$1" == "--pi" ]]; then
+        cat << 'EOF'
+==========================================
+MoNa-pi Commands (--pi 파라미터 사용)
+==========================================
+[환경/이동]
+  vla-cd --pi              MoNa-pi 디렉토리로 이동
+  vla-env --pi             MoNa-pi 환경 변수 확인
+
+[데이터 수집]
+  vla-collect --pi [args]  키보드 수집기 (Ramp 가감속)
+  vla-collect-ros --pi     ROS2 토픽 레코더
+    예) vla-collect --pi --output /data/ep001.h5 --task "장애물 회피"
+
+[학습]
+  vla-train --pi [config]  학습 시작 (기본: configs/train.yaml)
+  vla-eval --pi [ckpt]     오프라인 평가 (기본: checkpoints/best)
+
+[추론 서버]
+  vla-server --pi [args]   FastAPI 추론 서버 시작 (포트 8080)
+    예) vla-server --pi --ckpt checkpoints/best --steps 5
+
+[로봇 제어]
+  vla-inference --pi [args] ROS2 컨트롤러 노드 시작
+    예) vla-inference --pi --instruction "장애물 피해 직진"
+
+[분석/유틸]
+  vla-analyze --pi          액션 분포 히스토그램
+  vla-close --pi            MoNa-pi 프로세스 전체 종료
+
+[경로]
+  MONA_PI_ROOT = $MONA_PI_ROOT
+==========================================
+EOF
+    else
+        # 기존 MoNaVLA 도움말 (원본 재현)
+        echo "=========================================="
+        echo "MoNaVLA Commands - ${VLA_SERVER_NAME:-MoNaVLA}"
+        echo "=========================================="
+        echo ""
+        echo "환경 설정:"
+        echo "  vla-env          - 환경 변수 확인"
+        echo "  vla-cd           - 프로젝트로 이동"
+        echo "  vla-network-check - 네트워크 연결 확인"
+        echo ""
+        echo "데이터 수집/추론:"
+        echo "  vla-collect      - Gradio 데이터 수집기"
+        echo "  vla-server       - 추론 서버 시작"
+        echo "  vla-inference    - ROS2 클라이언트 노드"
+        echo "  vla-analyze      - H5 오프라인 분석기"
+        echo ""
+        echo "시스템:"
+        echo "  vla-close        - 프로세스 종료"
+        echo "  vla-build        - ROS2 colcon build"
+        echo "  vla-gpu          - GPU 상태"
+        echo ""
+        echo "MoNa-pi 명령어 보기:  vla-help --pi"
+        echo "=========================================="
+    fi
+}
+alias mona-help='vla-help'
+
+# ── 로드 확인 메시지 ──────────────────────────────────────────────────────────
+# echo "✓ MoNa-pi aliases loaded  (--pi 파라미터로 MoNa-pi 명령 사용 가능)"

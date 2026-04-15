@@ -1,0 +1,49 @@
+# MoNa-pi 학습 설정
+# python training/train.py --config configs/train.yaml
+
+model:
+  action_dim: 3          # (linear_x, linear_y, angular_z)
+  horizon: 10            # 예측 액션 청크 크기
+  hidden_dim: 512        # Flow Head 히든 차원
+  n_flow_steps: 50       # ODE 학습용 타임스텝 수
+  backbone_out_dim: 2048 # Gemma-2B 출력 차원
+  n_cond_tokens: 64      # PerceiverResampler 출력 토큰 수
+
+data:
+  # v5 데이터셋 경로 (실제 경로로 변경)
+  train_path: /home/soda/MoNaVLA/ROS_action/mobile_vla_dataset_v5/
+  val_split: 0.1         # 전체 중 10%를 검증용으로
+  window_size: 8         # 이미지 이력 윈도우
+  image_size: 384        # SigLIP 입력 해상도
+  preprocess: true       # ActionSmoother + IntentPrefix 활성화
+  smooth: true
+  inject_prefix: true
+  use_delta: false       # True: 속도→변위 변환 실험용
+
+  # MoNaVLA 계승: 증강 & Counterfactual
+  augment: true              # HFlip 50% + angular_z 반전 + instruction 교체
+  use_color_jitter: true     # ColorJitter (brightness/contrast/saturation/hue)
+  use_random_crop: false     # RandomResizedCrop (384 해상도에서는 성능 이득 미미)
+  use_counterfactual: true   # Counterfactual stop/steer 주입
+  cf_stop_prob: 0.05         # 5% 확률로 정지 명령 오버라이드
+  cf_steer_prob: 0.05        # 5% 확률로 회전 명령 오버라이드
+
+train:
+  batch_size: 4          # Jetson AGX 메모리 고려
+  lr: 1.0e-4
+  epochs: 50
+  warmup_steps: 500
+  grad_clip: 1.0         # gradient clipping max norm
+  checkpoint_dir: checkpoints/
+  keep_top_k: 3          # best val_loss 기준 체크포인트 유지 수
+  seed: 42
+
+pretrain:
+  # 기존 MoNaVLA 체크포인트 경로 (없으면 빈 문자열)
+  ckpt_path: ""
+
+logging:
+  use_wandb: false       # true: W&B, false: TensorBoard
+  project: mona-pi
+  entity: shosae         # W&B 사용자명
+  log_every_n_steps: 20
