@@ -1,98 +1,143 @@
 import torch
 import torch.nn as nn
-from .backbones.pi0_backbone import Pi0Backbone
-from .heads.flow_head import FlowMatchingHead
+
 
 class Pi0VLA(nn.Module):
     """
-    MoNa-pi Main Model Wrapper (Original pi0 Spec)
+    MoNa-pi Main Model Wrapper — π0 논문 아키텍처
+
+    use_paligemma=True (기본, 권장):
+        PaliGemmaBackbone + ActionExpert
+        → 실제 π0 논문 구조
+        → VLM 전체 토큰 시퀀스를 ActionExpert에 전달
+
+    use_paligemma=False (fallback):
+        Pi0Backbone (SigLIP + PerceiverResampler + Gemma) + FlowMatchingHead
+        → 이전 구현 (하위 호환)
     """
+
     def __init__(
         self,
-        action_dim=3,
-        horizon=10,
-        hidden_dim=512,
-        vision_model_id="google/siglip-so400m-patch14-384",
-        lang_model_id="google/gemma-2b",
-        full_seq_cond: bool = False,
-        **kwargs
+        action_dim: int = 3,
+        horizon: int = 10,
+        hidden_dim: int = 512,
+        use_paligemma: bool = True,
+        load_pretrained_paligemma: bool = False,
+        vision_model_id: str = "google/siglip-so400m-patch14-384",
+        lang_model_id: str = "google/gemma-2b",
+        paligemma_id: str = "google/paligemma-3b-pt-224",
+        **kwargs,
     ):
         super().__init__()
-        self.full_seq_cond = full_seq_cond
+        self.use_paligemma = use_paligemma
 
-        # 1. Real pi0 Backbone (SigLIP + Gemma + Resampler)
-        self.backbone = Pi0Backbone(
-            vision_model_id=vision_model_id,
-            lang_model_id=lang_model_id,
-            full_seq_cond=full_seq_cond,
-        )
-        
-        self.backbone_out_dim = self.backbone.lang_hidden_size # e.g., 2048
-        
-        # 2. Flow Matching Head
-        self.flow_head = FlowMatchingHead(
-            input_dim=self.backbone_out_dim,
+        # ── 1. Backbone ───────────────────────────────────────────────
+        if use_paligemma:
+            from .backbones.paligemma_backbone import PaliGemmaBackbone
+            self.backbone = PaliGemmaBackbone(
+                paligemma_id=paligemma_id,
+                siglip_id=vision_model_id,
+                gemma_id=lang_model_id,
+                load_pretrained_paligemma=load_pretrained_paligemma,
+                max_text_len=kwargs.get("max_text_len", 48),
+            )
+        else:
+            from .backbones.pi0_backbone import Pi0Backbone
+            self.backbone = Pi0Backbone(
+                vision_model_id=vision_model_id,
+                lang_model_id=lang_model_id,
+                **kwargs,
+            )
+
+        cond_dim = self.backbone.lang_hidden_size  # 2048
+
+        # ── 2. Action Expert (= π0 Action Expert) ────────────────────
+        from .heads.action_expert import ActionExpert
+        self.action_expert = ActionExpert(
             action_dim=action_dim,
             horizon=horizon,
-            hidden_dim=hidden_dim
+            hidden_dim=hidden_dim,
+            cond_dim=cond_dim,
         )
-        
-        # 3. Ensure all components are in half precision for Jetson AGX
+
+        # backward compat: training/train.py, inference/engine.py 등이
+        # self.flow_head.horizon / self.flow_head.action_dim 참조
+        self.flow_head = self.action_expert._head
+
+        # ── 3. 전체 FP16 (Jetson AGX) ─────────────────────────────────
         self.half()
 
-    def forward_backbone(self, images, instructions):
+    # ─────────────────────────────────────────────────────────────────
+    def forward_backbone(self, images: torch.Tensor, instructions) -> torch.Tensor:
         """
-        images: (B, Window, C, H, W)
+        Args:
+            images:       (B, N, C, H, W)
+            instructions: List[str] 길이 B
+        Returns:
+            cond: (B, T_vlm, 2048)
+                use_paligemma=True:  T_vlm = T_vis + L  (전체 VLM 시퀀스)
+                use_paligemma=False: T_vlm = 64         (PerceiverResampler latent)
         """
-        # pi0-style: Pass images through SigLIP -> Resampler -> Gemma
-        # instructions are handled inside backbone or as prefix
-        cond = self.backbone(images, instructions)
-        return cond # (B, 64, 2048)
+        return self.backbone(images, instructions)
 
-    def compute_loss(self, images, instructions, actions_gt):
+    def compute_loss(
+        self,
+        images: torch.Tensor,
+        instructions,
+        actions_gt: torch.Tensor,
+    ) -> torch.Tensor:
         """
-        Training loss computation.
-        Auto-casts inputs to model dtype so fp32 DataLoader tensors work
-        seamlessly with the fp16 model.
+        Flow Matching 학습 손실.
+        fp32 DataLoader 텐서도 모델 dtype(fp16)으로 자동 캐스팅.
         """
         model_dtype = next(self.parameters()).dtype
-        images = images.to(dtype=model_dtype)
+        images     = images.to(dtype=model_dtype)
         actions_gt = actions_gt.to(dtype=model_dtype)
+
         cond = self.forward_backbone(images, instructions)
-        loss = self.flow_head.get_loss(actions_gt, cond)
-        return loss
+        return self.action_expert.get_loss(actions_gt, cond)
 
     @torch.no_grad()
-    def sample_actions(self, images, instructions, n_steps=5):
+    def sample_actions(
+        self,
+        images: torch.Tensor,
+        instructions,
+        n_steps: int = 5,
+    ) -> torch.Tensor:
         """
-        ODE Solver (Heun's method)를 이용한 액션 샘플링
+        Heun's method ODE solver로 액션 청크 샘플링.
+
+        Returns:
+            x_t: (B, horizon, action_dim)
         """
         model_dtype = next(self.parameters()).dtype
         images = images.to(dtype=model_dtype)
         device = images.device
-        dtype = model_dtype
+        dtype  = model_dtype
+
         cond = self.forward_backbone(images, instructions)
-        B = cond.shape[0]
-        
-        # 1. 초기 노이즈 (x_0 ~ N(0, I))
-        x_t = torch.randn(B, self.flow_head.horizon, self.flow_head.action_dim, device=device, dtype=dtype)
-        
-        # 2. Heun's Method Solver
+        B    = cond.shape[0]
+
+        # 초기 노이즈
+        x_t = torch.randn(
+            B, self.flow_head.horizon, self.flow_head.action_dim,
+            device=device, dtype=dtype,
+        )
+
+        # Heun's Method
         for i in range(n_steps):
-            t_curr = (i / n_steps)
-            t_next = ((i + 1) / n_steps)
-            dt = t_next - t_curr
-            
-            t_curr_tensor = torch.full((B,), t_curr, device=device, dtype=dtype)
-            v_t = self.flow_head(x_t, t_curr_tensor, cond)
-            
-            # Predict x_next
-            x_next_approx = x_t + v_t * dt
-            
-            # Correction step
-            t_next_tensor = torch.full((B,), t_next, device=device, dtype=dtype)
-            v_t_next = self.flow_head(x_next_approx, t_next_tensor, cond)
-            
-            x_t = x_t + (v_t + v_t_next) * 0.5 * dt
-            
+            t_curr = i / n_steps
+            t_next = (i + 1) / n_steps
+            dt     = t_next - t_curr
+
+            t_c = torch.full((B,), t_curr, device=device, dtype=dtype)
+            v_t = self.action_expert(x_t, t_c, cond)
+
+            x_next = x_t + v_t * dt
+
+            t_n    = torch.full((B,), t_next, device=device, dtype=dtype)
+            v_next = self.action_expert(x_next, t_n, cond)
+
+            x_t = x_t + (v_t + v_next) * 0.5 * dt
+
         return x_t

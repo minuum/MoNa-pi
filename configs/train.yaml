@@ -4,11 +4,15 @@
 model:
   action_dim: 3          # (linear_x, linear_y, angular_z)
   horizon: 10            # 예측 액션 청크 크기
-  hidden_dim: 512        # Flow Head 히든 차원
+  hidden_dim: 512        # Action Expert 히든 차원
   n_flow_steps: 50       # ODE 학습용 타임스텝 수
-  backbone_out_dim: 2048 # Gemma-2B 출력 차원
-  n_cond_tokens: 64      # PerceiverResampler 출력 토큰 수
-  full_seq_cond: true    # π0 Action Expert 방식: FlowHead에 전체 VLM 시퀀스(64+L) 전달
+
+  # PaliGemma 백본 설정 (π0 논문 방식)
+  use_paligemma: true
+  load_pretrained_paligemma: false  # true: HF에서 paligemma-3b 다운로드
+  paligemma_id: "google/paligemma-3b-pt-224"
+  vision_model_id: "google/siglip-so400m-patch14-384"
+  lang_model_id: "google/gemma-2b"
 
 data:
   # v5 데이터셋 경로 (실제 경로로 변경)
