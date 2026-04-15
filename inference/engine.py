@@ -198,7 +198,7 @@ class MoNaPiEngine:
         x_init = torch.randn(B, self.horizon, self.action_dim, device=self.device, dtype=cond.dtype)
 
         def velocity_fn(x_t, t_batch, c):
-            return self.model.flow_head(x_t, t_batch, c)
+            return self.model.action_expert(x_t, t_batch, c)
 
         x_final = self.solver.solve(velocity_fn, x_init, cond)
         return x_final.squeeze(0).float().cpu().numpy()  # (horizon, action_dim)

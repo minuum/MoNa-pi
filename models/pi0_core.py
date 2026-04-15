@@ -60,9 +60,6 @@ class Pi0VLA(nn.Module):
             cond_dim=cond_dim,
         )
 
-        # backward compat: training/train.py, inference/engine.py 등이
-        # self.flow_head.horizon / self.flow_head.action_dim 참조
-        self.flow_head = self.action_expert._head
 
         # ── 3. 전체 FP16 (Jetson AGX) ─────────────────────────────────
         self.half()
@@ -120,7 +117,7 @@ class Pi0VLA(nn.Module):
 
         # 초기 노이즈
         x_t = torch.randn(
-            B, self.flow_head.horizon, self.flow_head.action_dim,
+            B, self.action_expert.horizon, self.action_expert.action_dim,
             device=device, dtype=dtype,
         )
 
