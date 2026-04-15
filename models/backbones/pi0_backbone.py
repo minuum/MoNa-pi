@@ -1,75 +1,141 @@
 import os
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoProcessor, GemmaForCausalLM
+from transformers import AutoModel, AutoProcessor, GemmaForCausalLM, AutoTokenizer
 from ..components.resampler import PerceiverResampler
+
 
 class Pi0Backbone(nn.Module):
     """
-    Original pi0 Backbone Configuration:
-    - Vision: SigLIP (SO400M)
-    - Language: Gemma-2B
-    - Bridge: Perceiver Resampler
+    π0 스타일 Vision-Language Backbone
+
+    구조:
+        SigLIP SO400M  ──→  PerceiverResampler (64 latents)  ─┐
+                                                               ├─→ Gemma-2B joint forward ──→ (B, 64, 2048)
+        AutoTokenizer  ──→  embed_tokens  ──────────────────  ─┘
+
+    π0 논문 방식:
+        PaliGemma (SigLIP + Gemma)가 시각·언어 토큰을 공동 어텐션으로 처리.
+        [visual_latents(64) | text_tokens(L)] 을 Gemma transformer에 통과시켜
+        언어 정보가 반영된 시각 conditioning 생성.
+
+        ← 이전 구현의 문제: text_input이 완전히 무시되어 언어 지시가
+          FlowMatchingHead conditioning에 반영되지 않았음.
     """
+
     def __init__(
         self,
-        vision_model_id="google/siglip-so400m-patch14-384",
-        lang_model_id="google/gemma-2b",
-        num_latents=64,
-        **kwargs
+        vision_model_id: str = "google/siglip-so400m-patch14-384",
+        lang_model_id: str = "google/gemma-2b",
+        num_latents: int = 64,
+        max_text_len: int = 48,
+        **kwargs,
     ):
         super().__init__()
-        
-        # 1. Vision Encoder (SigLIP)
+        self.num_latents = num_latents
+        self.max_text_len = max_text_len
+
         token = os.getenv("HF_TOKEN")
+
+        # ── 1. Vision Encoder: SigLIP SO400M ──────────────────────
         print(f"Loading Vision Encoder: {vision_model_id} (FP16)...")
         self.vision_encoder = AutoModel.from_pretrained(
-            vision_model_id, 
+            vision_model_id,
             token=token,
             torch_dtype=torch.float16,
-            low_cpu_mem_usage=True
+            low_cpu_mem_usage=True,
         )
-        self.vision_processor = AutoProcessor.from_pretrained(vision_model_id, token=token)
-        
-        # 2. Language Model (Gemma)
+        self.vision_processor = AutoProcessor.from_pretrained(
+            vision_model_id, token=token
+        )
+        vision_hidden = self.vision_encoder.config.vision_config.hidden_size  # 1152
+
+        # ── 2. Language Model: Gemma-2B ───────────────────────────
         print(f"Loading Language Model: {lang_model_id} (FP16)...")
         self.lang_model = GemmaForCausalLM.from_pretrained(
-            lang_model_id, 
+            lang_model_id,
             token=token,
             torch_dtype=torch.float16,
-            low_cpu_mem_usage=True
+            low_cpu_mem_usage=True,
         )
-        self.lang_hidden_size = self.lang_model.config.hidden_size
-        
-        # 3. Perceiver Resampler (Bridge)
+        self.lang_hidden_size = self.lang_model.config.hidden_size  # 2048
+
+        # 텍스트 토크나이저 (pad token 보장)
+        self.tokenizer = AutoTokenizer.from_pretrained(lang_model_id, token=token)
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+        # ── 3. PerceiverResampler: SigLIP 1152D → Gemma 2048D ────
         self.resampler = PerceiverResampler(
-            dim=self.lang_hidden_size,
-            context_dim=self.vision_encoder.config.vision_config.hidden_size,
-            num_latents=num_latents
+            dim=self.lang_hidden_size,   # 2048
+            context_dim=vision_hidden,   # 1152
+            num_latents=num_latents,     # 64
         )
 
-    def forward(self, images, text_input=None):
+        # 전체 FP16 변환 (Jetson AGX 메모리 최적화)
+        self.half()
+
+    # ─────────────────────────────────────────────────────────────
+    def forward(self, images: torch.Tensor, text_input=None) -> torch.Tensor:
         """
-        images: (B, N_cam, C, H, W)
+        Args:
+            images:     (B, N_cam, C, H, W)   FP16, CLIP 정규화됨
+            text_input: List[str] 길이 B        — 자연어 지시문
+        Returns:
+            cond: (B, 64, 2048)  언어 정보가 반영된 시각 conditioning
         """
         B, N, C, H, W = images.shape
-        images = images.view(B * N, C, H, W)
-        
-        # 1. Extract Vision Features
-        # SigLIP returns (B*N, SeqLen, Hidden)
-        vision_outputs = self.vision_encoder.vision_model(images)
-        vision_features = vision_outputs.last_hidden_state # (B*N, T, D)
-        
-        # Ensure dtype consistency (SigLIP sometimes outputs float32 even if loaded in fp16)
-        vision_features = vision_features.to(images.dtype)
-        
-        # 2. Reshape for Resampler
-        vision_features = vision_features.view(B, N, -1, vision_features.shape[-1])
-        
-        # 3. Resample to Fixed Visual Tokens
-        visual_latents = self.resampler(vision_features) # (B, 64, 2048)
-        
-        # 4. Integrate Text and Vision (Simple Concat for now)
-        # In π0, they often use vis-tokens as prefix tokens for Gemma
-        # Here we just return the fused representation for the Flow Head
-        return visual_latents
+        dtype  = images.dtype
+        device = images.device
+
+        # ── Step 1: SigLIP 시각 특징 추출 ─────────────────────────
+        vis_out = self.vision_encoder.vision_model(
+            images.view(B * N, C, H, W)
+        )
+        vision_feats = vis_out.last_hidden_state.to(dtype)          # (B*N, T, 1152)
+        vision_feats = vision_feats.view(B, N, -1, vision_feats.shape[-1])
+
+        # ── Step 2: PerceiverResampler → 64 고정 시각 토큰 ────────
+        visual_latents = self.resampler(vision_feats)               # (B, 64, 2048)
+
+        # ── Step 3: Gemma-2B로 시각·언어 공동 어텐션 ─────────────
+        if text_input is not None:
+            # 텍스트 토크나이저 (배치 패딩 포함)
+            enc = self.tokenizer(
+                text_input,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=self.max_text_len,
+            )
+            input_ids = enc.input_ids.to(device)          # (B, L)
+            text_mask = enc.attention_mask.to(device)      # (B, L)
+
+            # Gemma embed_tokens: 토크나이저 출력 → 임베딩 공간
+            text_embeds = self.lang_model.model.embed_tokens(input_ids).to(dtype)
+            # (B, L, 2048)
+
+            # [시각 64토큰 | 텍스트 L토큰] 연결
+            combined_embeds = torch.cat([visual_latents, text_embeds], dim=1)
+            # (B, 64+L, 2048)
+
+            visual_mask = torch.ones(
+                B, self.num_latents, device=device, dtype=text_mask.dtype
+            )
+            combined_mask = torch.cat([visual_mask, text_mask], dim=1)
+            # (B, 64+L)
+
+            # Gemma transformer 전체를 인코더 모드로 실행
+            # (causal mask 없음 — 시각과 언어 토큰이 서로 어텐션 가능)
+            gemma_out = self.lang_model.model(
+                inputs_embeds=combined_embeds,
+                attention_mask=combined_mask,
+            )
+            # 언어 grounded 시각 latent 슬라이스만 반환
+            cond = gemma_out.last_hidden_state[:, : self.num_latents]
+            # (B, 64, 2048)
+        else:
+            # 언어 없을 때: 시각 latent만 반환 (순수 시각 conditioning)
+            cond = visual_latents
+
+        return cond  # (B, 64, 2048)
