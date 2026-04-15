@@ -301,6 +301,7 @@
     <li><a href="#results">검증</a></li>
     <li><a href="#roadmap">로드맵</a></li>
     <li><a href="#transfer">도메인 이전</a></li>
+    <li><a href="#prompt">언어 설계</a></li>
   </ul>
   <a href="https://github.com/minuum/MoNa-pi" class="nav-gh" target="_blank">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
@@ -1235,6 +1236,361 @@ INTENT_LABELS = [
         <div class="rc-sub">새 도메인 50~500 에피소드가 진짜 장벽</div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ════════════ PROMPT DESIGN ════════════ -->
+<section id="prompt">
+  <div class="container fade-in">
+    <p class="section-label">언어 설계</p>
+    <h2>모바일 VLA에 효과적인 프롬프트란?</h2>
+    <p class="section-intro">
+      SigLIP · Gemma-2B · PerceiverResampler · FlowMatchingHead 각각의 특성이
+      어떤 언어 표현을 "좋아하는지" 분석합니다.
+      잘못된 instruction은 액션 분포를 흩뜨리고 주행을 불안정하게 만듭니다.
+    </p>
+
+    <!-- ── VLM 컴포넌트별 언어 처리 특성 ── -->
+    <h3 style="margin-bottom:1rem">각 컴포넌트가 언어를 다루는 방식</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.9rem; margin-bottom:2.5rem">
+
+      <div style="border:1px solid #bfdbfe; border-radius:var(--radius); background:#eff6ff; padding:1.1rem">
+        <div style="font-size:.72rem; font-weight:700; color:var(--accent); letter-spacing:.06em; text-transform:uppercase; margin-bottom:.5rem">👁 SigLIP SO400M</div>
+        <div style="font-size:.85rem; color:var(--text-2); line-height:1.75">
+          <b>Contrastive 학습</b>으로 텍스트와 패치가 정렬됨.<br/>
+          "빨간 장애물"이라는 단어가 있으면 해당 색상 패치에 attention이 집중.<br/>
+          <span style="color:var(--accent)">→ 시각적 앵커(색·형태·위치)를 명시하면 그라운딩 품질 ↑</span>
+        </div>
+      </div>
+
+      <div style="border:1px solid #d8b4fe; border-radius:var(--radius); background:#faf5ff; padding:1.1rem">
+        <div style="font-size:.72rem; font-weight:700; color:#7c3aed; letter-spacing:.06em; text-transform:uppercase; margin-bottom:.5rem">💬 Gemma-2B</div>
+        <div style="font-size:.85rem; color:var(--text-2); line-height:1.75">
+          <b>2B 파라미터</b> — 복잡한 추론보다 직관적 명령이 유리.<br/>
+          영어 성능 &gt; 한국어지만 fine-tune 데이터로 보완 가능.<br/>
+          부정문·조건문 이해가 약함.<br/>
+          <span style="color:#7c3aed">→ 단문·목표 지향적 표현이 복문보다 효과적</span>
+        </div>
+      </div>
+
+      <div style="border:1px solid #fed7aa; border-radius:var(--radius); background:#fff7ed; padding:1.1rem">
+        <div style="font-size:.72rem; font-weight:700; color:var(--orange); letter-spacing:.06em; text-transform:uppercase; margin-bottom:.5rem">🔗 PerceiverResampler</div>
+        <div style="font-size:.85rem; color:var(--text-2); line-height:1.75">
+          64토큰으로 압축 시 <b>언어 conditioning에 따라</b> 어떤 시각 패치를 보존할지 결정.<br/>
+          "바구니"라는 단어 → 바구니 영역 패치 우선 보존.<br/>
+          <span style="color:var(--orange)">→ 목표 객체를 명시하면 resampler가 관련 영역 집중</span>
+        </div>
+      </div>
+
+      <div style="border:1px solid #6ee7b7; border-radius:var(--radius); background:#ecfdf5; padding:1.1rem">
+        <div style="font-size:.72rem; font-weight:700; color:#065f46; letter-spacing:.06em; text-transform:uppercase; margin-bottom:.5rem">⚡ FlowMatchingHead</div>
+        <div style="font-size:.85rem; color:var(--text-2); line-height:1.75">
+          conditioning이 약하면 <b>액션 분포가 퍼져</b> 불안정한 행동 생성.<br/>
+          명확한 intent prefix → 분포의 mode가 좁아짐.<br/>
+          모호한 instruction → 분산 큰 Gaussian → 뭐든 할 수 있음.<br/>
+          <span style="color:#065f46">→ [INTENT] prefix가 분포를 안정화하는 핵심 장치</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── classify_intent 작동 원리 ── -->
+    <h3 style="margin-bottom:.75rem">의도 자동 분류 — 어떻게 레이블이 붙는가</h3>
+    <p style="font-size:.9rem; color:var(--text-2); margin-bottom:1.1rem">
+      학습 데이터의 <code>[INTENT]</code> 레이블은 <strong>액션 청크의 평균값</strong>으로 자동 분류됩니다 (<code>classify_intent()</code>).
+      임계값 근처의 모호한 움직임이 가장 취약한 지점입니다.
+    </p>
+    <div class="arch-wrap" style="padding:1.2rem">
+      <svg viewBox="0 0 760 200" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+        <!-- axes -->
+        <line x1="80" y1="100" x2="700" y2="100" stroke="#e5e7eb" stroke-width="1.5"/>
+        <line x1="390" y1="20" x2="390" y2="180" stroke="#e5e7eb" stroke-width="1.5"/>
+
+        <!-- axis labels -->
+        <text x="700" y="115" fill="#6b7280" font-size="10" text-anchor="middle">lx (전진/후진)</text>
+        <text x="395" y="17" fill="#6b7280" font-size="10">az (회전)</text>
+
+        <!-- threshold lines -->
+        <line x1="80" y1="100" x2="700" y2="100" stroke="#e5e7eb" stroke-width="1"/>
+        <!-- lx threshold vertical lines -->
+        <line x1="248" y1="25" x2="248" y2="175" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,3" opacity=".7"/>
+        <line x1="532" y1="25" x2="532" y2="175" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,3" opacity=".7"/>
+        <!-- az threshold horizontal lines -->
+        <line x1="80" y1="52" x2="700" y2="52" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,3" opacity=".7"/>
+        <line x1="80" y1="148" x2="700" y2="148" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,3" opacity=".7"/>
+
+        <!-- threshold labels -->
+        <text x="248" y="185" fill="#d97706" font-size="9" text-anchor="middle">lx=-0.15</text>
+        <text x="532" y="185" fill="#d97706" font-size="9" text-anchor="middle">lx=+0.15</text>
+        <text x="76" y="55" fill="#d97706" font-size="9" text-anchor="end">az=+0.15</text>
+        <text x="76" y="151" fill="#d97706" font-size="9" text-anchor="end">az=-0.15</text>
+
+        <!-- ZONE LABELS -->
+        <!-- STOP zone (center) -->
+        <rect x="248" y="52" width="284" height="96" fill="#f3f4f6" rx="4" opacity=".5"/>
+        <text x="390" y="104" fill="#9ca3af" font-size="11" font-weight="700" text-anchor="middle">STOP</text>
+        <text x="390" y="116" fill="#9ca3af" font-size="8" text-anchor="middle">|lx|&lt;0.15 &amp; |az|&lt;0.15</text>
+
+        <!-- FORWARD -->
+        <rect x="532" y="52" width="160" height="96" fill="#dbeafe" rx="4" opacity=".6"/>
+        <text x="612" y="104" fill="#1d4ed8" font-size="10" font-weight="700" text-anchor="middle">FORWARD</text>
+
+        <!-- BACKWARD -->
+        <rect x="80" y="52" width="168" height="96" fill="#fee2e2" rx="4" opacity=".5"/>
+        <text x="164" y="104" fill="#dc2626" font-size="10" font-weight="700" text-anchor="middle">BACKWARD</text>
+
+        <!-- TURN_LEFT (az > 0.15, center lx) -->
+        <rect x="248" y="20" width="284" height="32" fill="#dcfce7" rx="4" opacity=".6"/>
+        <text x="390" y="40" fill="#15803d" font-size="10" font-weight="700" text-anchor="middle">TURN_LEFT</text>
+
+        <!-- TURN_RIGHT (az < -0.15, center lx) -->
+        <rect x="248" y="148" width="284" height="30" fill="#fce7f3" rx="4" opacity=".6"/>
+        <text x="390" y="165" fill="#9d174d" font-size="10" font-weight="700" text-anchor="middle">TURN_RIGHT</text>
+
+        <!-- FORWARD_LEFT (fwd + turn_left) -->
+        <rect x="532" y="20" width="160" height="32" fill="#d1fae5" rx="4" opacity=".7"/>
+        <text x="612" y="40" fill="#065f46" font-size="9" font-weight="700" text-anchor="middle">FWD_LEFT</text>
+
+        <!-- FORWARD_RIGHT -->
+        <rect x="532" y="148" width="160" height="30" fill="#fdf4ff" rx="4" opacity=".7"/>
+        <text x="612" y="165" fill="#7c3aed" font-size="9" font-weight="700" text-anchor="middle">FWD_RIGHT</text>
+
+        <!-- STRAFE zones (no lx threshold label) -->
+        <text x="164" y="40" fill="#6b7280" font-size="9" font-weight="700" text-anchor="middle">STRAFE_LEFT</text>
+        <text x="164" y="165" fill="#6b7280" font-size="9" font-weight="700" text-anchor="middle">STRAFE_RIGHT</text>
+
+        <!-- danger zone label -->
+        <text x="392" y="14" fill="#d97706" font-size="8.5" text-anchor="middle" font-weight="600">⚠ 임계값 근처 모호 구간</text>
+      </svg>
+    </div>
+    <p style="font-size:.82rem; color:var(--text-3); margin-top:.5rem; margin-bottom:2rem">
+      <strong>임계값 0.15</strong> 근처에서 생성된 데이터는 의도 레이블과 실제 액션이 불일치할 수 있습니다.
+      학습 시 이런 샘플이 많으면 동일한 instruction이 다른 행동을 유발하는 혼동이 생깁니다.
+    </p>
+
+    <!-- ── 좋은 vs 나쁜 패턴 ── -->
+    <h3 style="margin-bottom:.9rem">좋은 표현 vs 피해야 할 표현</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>유형</th><th>나쁜 표현 ❌</th><th>좋은 표현 ✅</th><th>이유</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>거리 기술</b></td>
+            <td><code>"1.5m 앞으로 이동해"</code></td>
+            <td><code>"저 바구니 앞까지 가"</code></td>
+            <td>VLM은 미터법을 물리적으로 이해 못함. 시각 앵커 기반 목표가 필요</td>
+          </tr>
+          <tr>
+            <td><b>부정 명령</b></td>
+            <td><code>"장애물 쪽으로 가지 마"</code></td>
+            <td><code>"[FORWARD_LEFT] 장애물 왼쪽으로 우회해"</code></td>
+            <td>Gemma-2B는 부정문 처리가 약함. 목표 행동을 직접 기술하는 것이 강함</td>
+          </tr>
+          <tr>
+            <td><b>조건 분기</b></td>
+            <td><code>"왼쪽이 막히면 오른쪽으로"</code></td>
+            <td><code>"[TURN_RIGHT] 오른쪽 경로로 이동해"</code></td>
+            <td>2B 모델에 if-else 추론 기대 금물. VLM이 이미 시각 장면을 보고 있음</td>
+          </tr>
+          <tr>
+            <td><b>방위 기반</b></td>
+            <td><code>"북쪽으로 이동"</code> / <code>"동쪽 방향"</code></td>
+            <td><code>"저 파란 벽 방향으로 직진"</code></td>
+            <td>절대 방위는 학습 데이터에 없음. 시각적으로 인식 가능한 기술 필요</td>
+          </tr>
+          <tr>
+            <td><b>추상적 목표</b></td>
+            <td><code>"올바른 경로를 따라가"</code></td>
+            <td><code>"[FORWARD] 정면에 보이는 출구로 직진해"</code></td>
+            <td>"올바른"은 시각 그라운딩 없음. 구체적인 시각 대상이 필요</td>
+          </tr>
+          <tr>
+            <td><b>과도하게 긴 문장</b></td>
+            <td><code>"주변을 살피며 효율적으로 회피하며 이동해"</code></td>
+            <td><code>"[TURN_LEFT] 왼쪽으로 돌아서 장애물을 피해"</code></td>
+            <td>Gemma-2B 2B 모델, 단문 선호. 핵심 동작 하나에 집중</td>
+          </tr>
+          <tr>
+            <td><b>임계값 근처</b></td>
+            <td><code>"살짝 왼쪽으로"</code> / <code>"아주 조금만 틀어"</code></td>
+            <td><code>"[TURN_LEFT] 왼쪽으로 회전해"</code> + 작은 az 값 데이터</td>
+            <td>0.15 임계 근처 모호성. prefix로 의도를 고정하고 액션 크기로 세기 표현</td>
+          </tr>
+          <tr>
+            <td><b>시각 앵커 없음</b></td>
+            <td><code>"앞으로 가"</code></td>
+            <td><code>"[FORWARD] 정면 회색 바구니를 향해 직진해"</code></td>
+            <td>SigLIP grounding은 텍스트 앵커에 반응. 객체 기술 → PerceiverResampler 집중도 ↑</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── 9-class 최적 표현 ── -->
+    <h3 style="margin-top:2.5rem; margin-bottom:1rem">의도 클래스별 권장 표현 패턴</h3>
+    <p style="font-size:.88rem; color:var(--text-3); margin-bottom:1.2rem">
+      VLM 특성 + 학습 데이터 분포를 고려한 권장 표현입니다. 학습 시 <strong>변형 7개 이상</strong>을 확보하는 것이 목표입니다.
+    </p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:.85rem">
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#dbeafe; padding:.55rem 1rem; display:flex; align-items:center; gap:.5rem">
+          <span style="font-family:var(--mono); font-size:.78rem; font-weight:700; color:#1d4ed8">[FORWARD]</span>
+          <span style="font-size:.75rem; color:#3b82f6">lx &gt; 0.15, |az| &lt; 0.15</span>
+        </div>
+        <div style="padding:.85rem 1rem; font-size:.82rem; line-height:2; color:var(--text-2)">
+          <span style="color:var(--green)">✓</span> "저 회색 바구니로 직진해"<br/>
+          <span style="color:var(--green)">✓</span> "[FORWARD] Straight ahead to the target"<br/>
+          <span style="color:var(--green)">✓</span> "정면 목표물을 향해 쭉 가"<br/>
+          <span style="color:#d97706">★ 시각 앵커</span> 포함 시 grounding ↑
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#dcfce7; padding:.55rem 1rem; display:flex; align-items:center; gap:.5rem">
+          <span style="font-family:var(--mono); font-size:.78rem; font-weight:700; color:#15803d">[TURN_LEFT]</span>
+          <span style="font-size:.75rem; color:#22c55e">az &lt; -0.15, |lx| &lt; 0.15</span>
+        </div>
+        <div style="padding:.85rem 1rem; font-size:.82rem; line-height:2; color:var(--text-2)">
+          <span style="color:var(--green)">✓</span> "왼쪽으로 회전해서 목표를 찾아"<br/>
+          <span style="color:var(--green)">✓</span> "Rotate left toward the basket"<br/>
+          <span style="color:var(--green)">✓</span> "좌측으로 각도를 틀어"<br/>
+          <span style="color:#dc2626">✗</span> "약간 왼쪽으로" (임계값 근처 위험)
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#fce7f3; padding:.55rem 1rem; display:flex; align-items:center; gap:.5rem">
+          <span style="font-family:var(--mono); font-size:.78rem; font-weight:700; color:#9d174d">[TURN_RIGHT]</span>
+          <span style="font-size:.75rem; color:#ec4899">az &gt; 0.15, |lx| &lt; 0.15</span>
+        </div>
+        <div style="padding:.85rem 1rem; font-size:.82rem; line-height:2; color:var(--text-2)">
+          <span style="color:var(--green)">✓</span> "오른쪽으로 조향을 바꿔"<br/>
+          <span style="color:var(--green)">✓</span> "Steer toward the right side"<br/>
+          <span style="color:var(--green)">✓</span> "우측 방향으로 보정해"<br/>
+          <span style="color:#d97706">★</span> 회전 후 목표 언급 시 안정성 ↑
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#d1fae5; padding:.55rem 1rem; display:flex; align-items:center; gap:.5rem">
+          <span style="font-family:var(--mono); font-size:.78rem; font-weight:700; color:#065f46">[FORWARD_LEFT]</span>
+          <span style="font-size:.75rem; color:#10b981">lx &gt; 0.15 &amp; az &lt; -0.15</span>
+        </div>
+        <div style="padding:.85rem 1rem; font-size:.82rem; line-height:2; color:var(--text-2)">
+          <span style="color:var(--green)">✓</span> "왼쪽 대각선으로 비스듬히 접근해"<br/>
+          <span style="color:var(--green)">✓</span> "장애물 왼쪽으로 돌아가"<br/>
+          <span style="color:var(--green)">✓</span> "Bear left of the obstacle"<br/>
+          <span style="color:#d97706">★ 장애물 회피</span>에 가장 많이 쓰이는 클래스
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#fdf4ff; padding:.55rem 1rem; display:flex; align-items:center; gap:.5rem">
+          <span style="font-family:var(--mono); font-size:.78rem; font-weight:700; color:#7c3aed">[FORWARD_RIGHT]</span>
+          <span style="font-size:.75rem; color:#a855f7">lx &gt; 0.15 &amp; az &gt; 0.15</span>
+        </div>
+        <div style="padding:.85rem 1rem; font-size:.82rem; line-height:2; color:var(--text-2)">
+          <span style="color:var(--green)">✓</span> "오른쪽 대각선으로 비스듬히 가"<br/>
+          <span style="color:var(--green)">✓</span> "Shift right while moving forward"<br/>
+          <span style="color:var(--green)">✓</span> "전진하면서 오른쪽으로 살짝 틀어"<br/>
+          <span style="color:#d97706">★</span> "while" / "하면서" 동시동작 표현이 자연스러움
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#f1f5f9; padding:.55rem 1rem; display:flex; align-items:center; gap:.5rem">
+          <span style="font-family:var(--mono); font-size:.78rem; font-weight:700; color:#475569">[STOP]</span>
+          <span style="font-size:.75rem; color:#94a3b8">|lx|,|az| &lt; 0.15</span>
+        </div>
+        <div style="padding:.85rem 1rem; font-size:.82rem; line-height:2; color:var(--text-2)">
+          <span style="color:var(--green)">✓</span> "멈춰" / "정지" / "스톱"<br/>
+          <span style="color:var(--green)">✓</span> "Halt" / "Freeze" / "Stand by"<br/>
+          <span style="color:var(--green)">✓</span> "바구니 앞에서 멈춰"<br/>
+          <span style="color:#d97706">★ Counterfactual</span> 5% 오버라이드로 정지 학습 강제
+        </div>
+      </div>
+
+      <div style="border:1px solid var(--border); border-radius:var(--radius); overflow:hidden">
+        <div style="background:#fff7ed; padding:.55rem 1rem; display:flex; align-items:center; gap:.5rem">
+          <span style="font-family:var(--mono); font-size:.78rem; font-weight:700; color:#c2410c">[STRAFE_LEFT/RIGHT]</span>
+          <span style="font-size:.75rem; color:#fb923c">|ly| &gt; 0.15</span>
+        </div>
+        <div style="padding:.85rem 1rem; font-size:.82rem; line-height:2; color:var(--text-2)">
+          <span style="color:var(--green)">✓</span> "왼쪽으로 옆으로 이동해"<br/>
+          <span style="color:var(--green)">✓</span> "Slide left while facing forward"<br/>
+          <span style="color:#dc2626">✗</span> "왼쪽으로" (TURN_LEFT와 혼동 위험)<br/>
+          <span style="color:#d97706">★ "옆으로" / "lateral"</span> 명시로 회전과 구분 필수
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 언어 설계 전략 ── -->
+    <h3 style="margin-top:2.5rem; margin-bottom:1rem">논문 기반 학습 데이터 언어 전략</h3>
+    <div class="inherit-grid">
+
+      <div class="inherit-item">
+        <div class="from">MobileVLA-R1 · CoT 기반</div>
+        <div class="what">Intent prefix가 분포를 안정화</div>
+        <div class="why">[INTENT] 태그 없이 "왼쪽으로 가"만 있으면 Flow Head가 TURN_LEFT와 STRAFE_LEFT 사이에서 분산이 커짐. prefix로 모드를 고정해야 함</div>
+      </div>
+
+      <div class="inherit-item">
+        <div class="from">OmniVLA · ICRA 2026</div>
+        <div class="what">10% 텍스트 dropout으로 시각 강인성 학습</div>
+        <div class="why">학습 데이터의 10%를 빈 instruction으로 만들면 모델이 언어에 과의존하지 않고 시각 정보 자체로도 판단 가능. 특히 명령이 모호할 때 시각 fallback이 작동</div>
+      </div>
+
+      <div class="inherit-item">
+        <div class="from">TIC-VLA · 2026</div>
+        <div class="what">시간 지연을 instruction에 반영</div>
+        <div class="why">현재 프레임 t에서 instruction을 생성하지만 실제 액션은 t+δ에 실행됨. "now"보다 "toward" / "approach" 같은 방향성 표현이 지연에 더 강건함</div>
+      </div>
+
+      <div class="inherit-item">
+        <div class="from">MoNaVLA · 다국어 20% 노이즈</div>
+        <div class="what">한/영 혼용 + 20% 범용 변형</div>
+        <div class="why">특정 언어 표현에 과적합 방지. "바구니로 가"와 "go to the basket" 모두 학습 → 추론 시 어떤 언어로 명령해도 작동. 범용 변형 20%가 언어 독립성을 강화</div>
+      </div>
+
+      <div class="inherit-item">
+        <div class="from">SigLIP Contrastive 특성</div>
+        <div class="what">색상 + 형태 기술로 grounding 강화</div>
+        <div class="why">SigLIP은 시각-텍스트 contrastive 학습 특성 상 "빨간", "둥근", "큰" 같은 시각적 속성 기술어에 강함. 공간적 앵커("왼쪽 구석", "가까운") 추가 시 PerceiverResampler attention 집중도 ↑</div>
+      </div>
+
+      <div class="inherit-item">
+        <div class="from">Gemma-2B 언어 특성</div>
+        <div class="what">영어 &gt; 한국어 강도, 그러나 혼합 유효</div>
+        <div class="why">Gemma-2B pretraining은 영어 비중이 높아 영어 instruction이 더 강한 latent를 생성함. 단, fine-tuning 데이터에 한국어를 포함하면 한국어도 동등하게 작동. 코드스위칭(혼합)도 유효</div>
+      </div>
+
+    </div>
+
+    <!-- ── 실전 권장 체크리스트 ── -->
+    <h3 style="margin-top:2.5rem; margin-bottom:.85rem">데이터 수집 시 instruction 체크리스트</h3>
+    <div class="math-block" style="font-family:var(--sans); font-size:.87rem; line-height:2.1">
+<span class="val">✅ 반드시 포함</span>
+  <span class="cmt">├</span> 각 의도 클래스마다 최소 <span class="kw">7개 이상</span> 변형 (한3 + 영4 기준)
+  <span class="cmt">├</span> 시각 앵커 포함 버전: <span class="kw">"저 [색상] [물체]를 향해"</span> 형태
+  <span class="cmt">├</span> 20% 확률로 범용 generic 표현 (<code>Navigate to the goal</code> 류)
+  <span class="cmt">├</span> STOP 명령 어휘 최소 6종 (정지 학습이 안전에 가장 중요)
+  <span class="cmt">└</span> STRAFE에 <span class="kw">"옆으로" / "laterally"</span> 명시 (TURN과 구분)
+
+<span class="val">⚠ 주의</span>
+  <span class="cmt">├</span> 부정문 최소화 → <span class="kw">목표 행동 직접 기술</span>로 대체
+  <span class="cmt">├</span> 절대 거리 금지 → <span class="kw">시각 앵커 기반 목표</span>로 대체
+  <span class="cmt">├</span> 임계값 0.15 근처 애매한 데이터에 prefix 명시 강제
+  <span class="cmt">└</span> 한 에피소드에 여러 의도가 섞이면 구간별 annotation 필요
+
+<span class="val">💡 개선 아이디어 (미구현)</span>
+  <span class="cmt">├</span> 10% 빈 instruction dropout (OmniVLA 방식, 시각 fallback 강화)
+  <span class="cmt">├</span> CoT 스타일: <span class="kw">"[TURN_LEFT] 왼쪽에 장애물이 있으므로 회전"</span> (이유 포함)
+  <span class="cmt">└</span> GRPO 보상 기반 instruction 품질 필터링 (MobileVLA-R1 방식)
+    </div>
+
   </div>
 </section>
 
