@@ -38,17 +38,20 @@ class MoNaPiEngine:
     MoNa-pi 모델 추론 엔진.
 
     Args:
-        model_path:   체크포인트 디렉토리 경로 (accelerate.save_model 결과물)
-        device:       "cuda" or "cpu"
-        solver:       "euler" | "heun" | "dpm"
-        n_ode_steps:  ODE 적분 스텝 수 (속도↔품질 트레이드오프)
-        action_dim:   로봇 액션 차원 (기본 3: vx, vy, wz)
-        horizon:      예측 청크 크기 (기본 10 스텝)
-        hidden_dim:   Flow Head 히든 차원
-        cache_vision: 동일 이미지 요청 시 비전 특징 캐시 여부
+        model_path:                  체크포인트 디렉토리 경로
+        device:                      "cuda" or "cpu"
+        solver:                      "euler" | "heun" | "dpm"
+        n_ode_steps:                 ODE 적분 스텝 수
+        action_dim:                  로봇 액션 차원 (기본 3: vx, vy, wz)
+        horizon:                     예측 청크 크기 (기본 10)
+        hidden_dim:                  Action Expert 히든 차원
+        use_paligemma:               True: PaliGemmaBackbone (π0 방식)
+        load_pretrained_paligemma:   True: HF에서 paligemma-3b 다운로드
+        vision_model_id:             로컬 SigLIP 모델 ID
+        lang_model_id:               로컬 Gemma 모델 ID
+        paligemma_id:                PaliGemma HF 모델 ID
+        cache_vision:                동일 이미지 연속 요청 시 VLM 캐시 여부
     """
-
-    IMG_SIZE = 384  # SigLIP 입력 해상도
 
     def __init__(
         self,
@@ -59,6 +62,11 @@ class MoNaPiEngine:
         action_dim: int = 3,
         horizon: int = 10,
         hidden_dim: int = 512,
+        use_paligemma: bool = True,
+        load_pretrained_paligemma: bool = False,
+        vision_model_id: str = "google/siglip-so400m-patch14-384",
+        lang_model_id: str = "google/gemma-2b",
+        paligemma_id: str = "google/paligemma-3b-pt-224",
         cache_vision: bool = True,
     ):
         self.model_path = Path(model_path)
@@ -68,7 +76,15 @@ class MoNaPiEngine:
         self.action_dim = action_dim
         self.horizon = horizon
         self.hidden_dim = hidden_dim
+        self.use_paligemma = use_paligemma
+        self.load_pretrained_paligemma = load_pretrained_paligemma
+        self.vision_model_id = vision_model_id
+        self.lang_model_id = lang_model_id
+        self.paligemma_id = paligemma_id
         self.cache_vision = cache_vision
+
+        # 입력 해상도: 로컬 SigLIP=384, 실제 PaliGemma=224
+        self.IMG_SIZE = 224 if load_pretrained_paligemma else 384
 
         self.model: Optional[Pi0VLA] = None
         self.normalizer = ActionNormalizer()
@@ -88,6 +104,11 @@ class MoNaPiEngine:
             action_dim=self.action_dim,
             horizon=self.horizon,
             hidden_dim=self.hidden_dim,
+            use_paligemma=self.use_paligemma,
+            load_pretrained_paligemma=self.load_pretrained_paligemma,
+            vision_model_id=self.vision_model_id,
+            lang_model_id=self.lang_model_id,
+            paligemma_id=self.paligemma_id,
         )
 
         # Accelerate 저장 형식 로드

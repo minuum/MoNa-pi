@@ -148,6 +148,8 @@ def build_engine(args) -> MoNaPiEngine:
         device=args.device,
         solver=args.solver,
         n_ode_steps=args.steps,
+        use_paligemma=not args.legacy_backbone,
+        load_pretrained_paligemma=args.pretrained_paligemma,
     )
     engine.warmup()
     return engine
@@ -161,6 +163,10 @@ def main():
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--solver", default="heun", choices=["euler", "heun", "dpm"])
     parser.add_argument("--steps",  type=int, default=5, help="ODE 스텝 수")
+    parser.add_argument("--legacy-backbone",     action="store_true",
+                        help="이전 Pi0Backbone 사용 (use_paligemma=False)")
+    parser.add_argument("--pretrained-paligemma", action="store_true",
+                        help="google/paligemma-3b-pt-224 다운로드 사용")
     parser.add_argument("--mock",   action="store_true",
                         help="모델 로드 없이 0 액션 반환 (통합 테스트용)")
     args = parser.parse_args()
