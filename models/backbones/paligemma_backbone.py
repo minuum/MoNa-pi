@@ -46,11 +46,13 @@ class PaliGemmaBackbone(nn.Module):
         if not load_pretrained:
             self._gemma_hidden = 2048  # PaliGemma-3B Gemma2 hidden size
         else:
+            # transformers 5.x: 서브모듈은 model.model 아래에 있음
+            inner = self.model.model
             if freeze_vision:
-                for p in self.model.vision_tower.parameters():
+                for p in inner.vision_tower.parameters():
                     p.requires_grad_(False)
             if freeze_language:
-                for p in self.model.language_model.parameters():
+                for p in inner.language_model.parameters():
                     p.requires_grad_(False)
             self._gemma_hidden = self.model.config.text_config.hidden_size
 
@@ -103,28 +105,43 @@ class PaliGemmaBackbone(nn.Module):
         device = images.device
         imgs_flat = images.view(B * W, C, H, H)  # (B*W, 3, H, H)
 
+        # 이미지 패치 수 계산 (mock/real 공통)
+        n_patches = (self.model.config.vision_config.image_size //
+                     self.model.config.vision_config.patch_size) ** 2
+        img_token_id = getattr(self.model.config, "image_token_index", 257152)
+        BW = B * W
+
         if self.processor is not None:
-            # 실제 가중치 모드 — processor로 토크나이징
+            # 실제 가중치 모드 — tokenizer로 텍스트만 토크나이징, pixel_values 직접 전달
             repeated_instructions = [inst for inst in instructions for _ in range(W)]
-            inputs = self.processor(
-                text=repeated_instructions,
-                images=None,
+            tok = self.processor.tokenizer(
+                repeated_instructions,
                 return_tensors="pt",
                 padding=True,
             ).to(device)
-            inputs["pixel_values"] = imgs_flat.to(self.dtype)
+            # input_ids 앞에 이미지 토큰 n_patches개 prepend
+            img_ids = torch.full((BW, n_patches), img_token_id, dtype=torch.long, device=device)
+            input_ids = torch.cat([img_ids, tok.input_ids], dim=1)
+            attn_mask = torch.cat([
+                torch.ones((BW, n_patches), dtype=torch.long, device=device),
+                tok.attention_mask,
+            ], dim=1)
+            token_type_ids = torch.cat([
+                torch.zeros((BW, n_patches), dtype=torch.long, device=device),
+                torch.ones_like(tok.attention_mask),
+            ], dim=1)
+            inputs = {
+                "pixel_values": imgs_flat.to(self.dtype),
+                "input_ids": input_ids,
+                "attention_mask": attn_mask,
+                "token_type_ids": token_type_ids,
+            }
         else:
-            # mock 모드 — 이미지 패치 수에 맞는 플레이스홀더 토큰 생성
-            # PaliGemma image token ID = 257152, patch_size=14, img_size=224 → 256 patches
-            n_patches = (self.model.config.vision_config.image_size //
-                         self.model.config.vision_config.patch_size) ** 2
-            img_token_id = getattr(self.model.config, "image_token_index", 257152)
-            BW = B * W
+            # mock 모드 — 더미 토큰으로 오프라인 구조 검증
             n_text = 8
             img_ids  = torch.full((BW, n_patches), img_token_id, dtype=torch.long, device=device)
             text_ids = torch.ones((BW, n_text), dtype=torch.long, device=device)
             input_ids = torch.cat([img_ids, text_ids], dim=1)
-            # token_type_ids: 0=이미지, 1=텍스트 (PaliGemma 학습 시 필수)
             token_type_ids = torch.cat([
                 torch.zeros((BW, n_patches), dtype=torch.long, device=device),
                 torch.ones((BW, n_text),    dtype=torch.long, device=device),
