@@ -2,3 +2,39 @@
 .menemory/sessions/
 .menemory/longterm/chroma_db/
 .menemory/longterm/memory.jsonl
+
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# HuggingFace model cache
+.cache/
+*.bin
+*.safetensors
+
+# Checkpoints
+checkpoints/
+
+# Datasets
+*.hdf5
+*.h5
+data/raw/
+
+# Logs & runs
+logs/
+runs/
+wandb/
+
+# Generated outputs
+scripts/*.png
+scripts/*.jpg
+
+# Misc
+*.egg-info/
+dist/
+build/
+.env
