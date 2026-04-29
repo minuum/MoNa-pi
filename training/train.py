@@ -24,7 +24,7 @@ from data.dataset import ActionChunkDataset
 # ── Hyperparameters ──────────────────────────────────────────────────────────
 DEFAULTS = dict(
     data_dir   = "/home/minum/minum/26CS/MoNa-pi/mobile_vla_dataset_v5",
-    epochs     = 30,
+    epochs     = 10,
     batch_size = 2,       # GB10 128GB 통합 메모리 기준 (VLM 포함)
     lr         = 2e-5,    # fine-tuning용 낮은 LR
     warmup     = 100,     # steps
@@ -68,9 +68,11 @@ def build_model(dtype):
 
 
 def train(cfg: dict):
-    accelerator = Accelerator(mixed_precision="fp16")
+    # BF16: FP16보다 range가 넓어 오버플로우 없음, GB10 Blackwell 네이티브 지원
+    # GradScaler 불필요 → clip_grad_norm_ 정상 동작
+    accelerator = Accelerator(mixed_precision="bf16")
     device = accelerator.device
-    dtype  = torch.float16
+    dtype  = torch.bfloat16
 
     if accelerator.is_main_process:
         print(f"\n{'='*60}")
