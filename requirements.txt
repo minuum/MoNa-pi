@@ -1,8 +1,11 @@
-torch>=2.0.0
-transformers
-accelerate
+torch>=2.11.0
+torchvision>=0.26.0
+transformers>=5.7.0
+accelerate>=1.13.0
 einops
 diffusers
 h5py
 numpy
 matplotlib
+Pillow
+tqdm

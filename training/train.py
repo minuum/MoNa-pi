@@ -1,99 +1,201 @@
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from accelerate import Accelerator
-from tqdm import tqdm
+"""
+MoNa-pi Training — PaliGemma-3B backbone + Flow Matching head
+Usage:
+    .venv/bin/python training/train.py
+    .venv/bin/python training/train.py --data_dir /path/to/dataset
+"""
+import argparse
 import os
 import sys
+import time
 
-# 프로젝트 루트 추가
+import torch
+from torch.utils.data import DataLoader, random_split
+from accelerate import Accelerator
+from tqdm import tqdm
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from models.backbones.paligemma_backbone import PaliGemmaBackbone
 from models.pi0_core import Pi0VLA
 from data.dataset import ActionChunkDataset
 
-def load_pretrained_weights(model, ckpt_path):
-    """
-    기존 VLM 백본 가중치 로드
-    """
-    if not os.path.exists(ckpt_path):
-        print(f"Warning: Checkpoint not found at {ckpt_path}. Starting from scratch.")
-        return model
-        
-    print(f"Loading weights from {ckpt_path}...")
-    checkpoint = torch.load(ckpt_path, map_location='cpu')
-    
-    # 모델의 state_dict와 체크포인트의 키 매칭 (백본 위주)
-    # Flow Head는 구조가 다르므로 무시하거나 부분 매칭 필요
-    model_dict = model.state_dict()
-    pretrained_dict = {k: v for k, v in checkpoint.items() if k in model_dict and v.shape == model_dict[k].shape}
-    
-    model_dict.update(pretrained_dict)
-    model.load_state_dict(model_dict)
-    print(f"Successfully loaded {len(pretrained_dict)} layers.")
-    return model
 
-def train():
-    accelerator = Accelerator()
-    device = accelerator.device
-    
-    # 1. Config & Hyperparameters
-    k = 10 # Chunk size (99% certainty)
-    window_size = 8 # Window size (99% certainty)
-    batch_size = 4 # Reduced for memory safety with windowed images
-    lr = 1e-4
-    epochs = 10
-    data_dir = "/home/soda/vla/ROS_action/mobile_vla_dataset_v3/"
-    ckpt_path = "/home/soda/vla/epoch_epoch=09-val_loss=val_loss=0.010.ckpt" 
-    
-    # 2. Dataset & Dataloader
-    dataset = ActionChunkDataset(directory=data_dir, k=k, window_size=window_size)
-    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-    
-    # 3. Model Setup (Placeholder backbone)
-    # 실제 환경에서는 HF에서 로드하거나 기존 가중치를 불러옴
-    backbone = nn.Identity() # Placeholder
+# ── Hyperparameters ──────────────────────────────────────────────────────────
+DEFAULTS = dict(
+    data_dir   = "/home/minum/minum/26CS/MoNa-pi/mobile_vla_dataset_v5",
+    epochs     = 30,
+    batch_size = 2,       # GB10 128GB 통합 메모리 기준 (VLM 포함)
+    lr         = 2e-5,    # fine-tuning용 낮은 LR
+    warmup     = 100,     # steps
+    grad_clip  = 1.0,
+    val_ratio  = 0.1,
+    num_workers= 0,       # GB10 통합 메모리 — 멀티프로세스 I/O 경합 방지
+    ckpt_dir   = "checkpoints",
+    save_every = 5,       # epoch마다 저장
+    log_every  = 10,      # step마다 로그
+)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def get_cosine_lr(optimizer, step: int, warmup: int, total: int, base_lr: float):
+    import math
+    if step < warmup:
+        lr = base_lr * step / max(1, warmup)
+    else:
+        progress = (step - warmup) / max(1, total - warmup)
+        lr = base_lr * 0.5 * (1.0 + math.cos(math.pi * progress))
+    for pg in optimizer.param_groups:
+        pg['lr'] = lr
+    return lr
+
+
+def build_model(dtype):
+    backbone = PaliGemmaBackbone(
+        load_pretrained=True,
+        freeze_vision=True,
+        freeze_language=False,
+        dtype=dtype,
+    )
     model = Pi0VLA(
         backbone=backbone,
         action_dim=3,
-        horizon=k,
-        backbone_out_dim=1024 
+        horizon=10,
+        hidden_dim=512,
+        backbone_out_dim=backbone.out_dim,
     )
-    
-    # Pre-trained weights 로드
-    model = load_pretrained_weights(model, ckpt_path)
-    
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    
-    # 4. Prepare for Distributed Training
-    model, optimizer, train_loader = accelerator.prepare(
-        model, optimizer, train_loader
+    return model
+
+
+def train(cfg: dict):
+    accelerator = Accelerator(mixed_precision="fp16")
+    device = accelerator.device
+    dtype  = torch.float16
+
+    if accelerator.is_main_process:
+        print(f"\n{'='*60}")
+        print(f"  MoNa-pi Training")
+        print(f"  data : {cfg['data_dir']}")
+        print(f"  device: {device}  |  dtype: {dtype}")
+        print(f"{'='*60}\n")
+
+    # ── Dataset ──────────────────────────────────────────────────
+    full_ds = ActionChunkDataset(
+        directory=cfg['data_dir'],
+        k=10, window_size=8,
+        augment=True,
     )
-    
-    # 5. Training Loop
-    model.train()
-    for epoch in range(epochs):
-        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch}", disable=not accelerator.is_local_main_process)
-        for batch in progress_bar:
-            images = batch['images']
-            actions = batch['actions']
-            instructions = batch['instructions']
-            
+    n_val  = max(1, int(len(full_ds) * cfg['val_ratio']))
+    n_train = len(full_ds) - n_val
+    train_ds, val_ds = random_split(full_ds, [n_train, n_val],
+                                    generator=torch.Generator().manual_seed(42))
+
+    train_loader = DataLoader(
+        train_ds, batch_size=cfg['batch_size'], shuffle=True,
+        num_workers=cfg['num_workers'], pin_memory=False,  # 통합 메모리 — pin 불필요
+    )
+    val_loader = DataLoader(
+        val_ds, batch_size=cfg['batch_size'], shuffle=False,
+        num_workers=cfg['num_workers'], pin_memory=False,
+    )
+
+    if accelerator.is_main_process:
+        print(f"Dataset: {len(full_ds)} samples (train={n_train}, val={n_val})")
+
+    # ── Model ─────────────────────────────────────────────────────
+    model = build_model(dtype)
+
+    total_params    = sum(p.numel() for p in model.parameters()) / 1e6
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6
+    if accelerator.is_main_process:
+        print(f"Model: {total_params:.1f}M total, {trainable_params:.1f}M trainable\n")
+
+    # ── Optimizer ─────────────────────────────────────────────────
+    optimizer = torch.optim.AdamW(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=cfg['lr'], weight_decay=0.01,
+    )
+
+    # ── Accelerate prepare ────────────────────────────────────────
+    model, optimizer, train_loader, val_loader = accelerator.prepare(
+        model, optimizer, train_loader, val_loader
+    )
+
+    total_steps = cfg['epochs'] * len(train_loader)
+    global_step = 0
+    best_val_loss = float('inf')
+
+    os.makedirs(cfg['ckpt_dir'], exist_ok=True)
+
+    # ── Training Loop ─────────────────────────────────────────────
+    for epoch in range(cfg['epochs']):
+        model.train()
+        epoch_loss = 0.0
+        t0 = time.time()
+
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1:02d}/{cfg['epochs']}",
+                    disable=not accelerator.is_main_process)
+
+        for batch in pbar:
+            images       = batch['images']            # (B, W, 3, 224, 224)
+            actions      = batch['actions']           # (B, 10, 3)
+            instructions = list(batch['instructions'])
+
+            lr = get_cosine_lr(optimizer, global_step, cfg['warmup'], total_steps, cfg['lr'])
+
             optimizer.zero_grad()
-            
             loss = model.compute_loss(images, instructions, actions)
-            
             accelerator.backward(loss)
+
+            if cfg['grad_clip'] > 0:
+                accelerator.clip_grad_norm_(model.parameters(), cfg['grad_clip'])
+
             optimizer.step()
-            
-            progress_bar.set_postfix(loss=loss.item())
-            
-        # 6. Save Checkpoint
-        if accelerator.is_local_main_process:
-            os.makedirs("checkpoints", exist_ok=True)
-            accelerator.save_model(model, f"checkpoints/mona_pi_epoch_{epoch}")
-            
-    print("Training Completed.")
+
+            loss_val = loss.item()
+            epoch_loss += loss_val
+            global_step += 1
+
+            if global_step % cfg['log_every'] == 0 and accelerator.is_main_process:
+                pbar.set_postfix(loss=f"{loss_val:.4f}", lr=f"{lr:.2e}")
+
+        # ── Validation ────────────────────────────────────────────
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for batch in val_loader:
+                images       = batch['images']
+                actions      = batch['actions']
+                instructions = list(batch['instructions'])
+                val_loss += model.compute_loss(images, instructions, actions).item()
+        val_loss /= max(1, len(val_loader))
+        epoch_loss /= max(1, len(train_loader))
+
+        elapsed = time.time() - t0
+        if accelerator.is_main_process:
+            print(f"  Epoch {epoch+1:02d} | train={epoch_loss:.4f} | val={val_loss:.4f} | "
+                  f"lr={lr:.2e} | {elapsed:.0f}s")
+
+        # ── Checkpoint ────────────────────────────────────────────
+        if accelerator.is_main_process:
+            if (epoch + 1) % cfg['save_every'] == 0:
+                ckpt = os.path.join(cfg['ckpt_dir'], f"mona_pi_epoch_{epoch+1:02d}")
+                accelerator.save_model(model, ckpt)
+                print(f"  Saved: {ckpt}")
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                ckpt = os.path.join(cfg['ckpt_dir'], "mona_pi_best")
+                accelerator.save_model(model, ckpt)
+                print(f"  Best model updated (val={val_loss:.4f})")
+
+    if accelerator.is_main_process:
+        print("\nTraining complete.")
+
 
 if __name__ == "__main__":
-    train()
+    parser = argparse.ArgumentParser()
+    for k, v in DEFAULTS.items():
+        parser.add_argument(f"--{k}", type=type(v), default=v)
+    args = parser.parse_args()
+    train(vars(args))
