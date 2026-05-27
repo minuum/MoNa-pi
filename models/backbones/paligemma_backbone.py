@@ -43,11 +43,11 @@ class PaliGemmaBackbone(nn.Module):
         if load_pretrained_paligemma:
             # ── Real PaliGemma: 공동 사전학습 가중치 ─────────────────
             from transformers import PaliGemmaForConditionalGeneration
-            print(f"Loading PaliGemma: {paligemma_id} (FP16)...")
+            print(f"Loading PaliGemma: {paligemma_id} (BF16)...")
             pg = PaliGemmaForConditionalGeneration.from_pretrained(
                 paligemma_id,
                 token=token,
-                torch_dtype=torch.float16,
+                torch_dtype=torch.bfloat16,
                 low_cpu_mem_usage=True,
             )
             self.vision_tower = pg.model.vision_tower            # SiglipVisionModel
@@ -58,21 +58,21 @@ class PaliGemmaBackbone(nn.Module):
 
         else:
             # ── 로컬 캐시: SigLIP + Gemma 별도 로드 ──────────────────
-            print(f"Loading Vision Tower: {siglip_id} (FP16)...")
+            print(f"Loading Vision Tower: {siglip_id} (BF16)...")
             siglip = AutoModel.from_pretrained(
                 siglip_id,
                 token=token,
-                torch_dtype=torch.float16,
+                torch_dtype=torch.bfloat16,
                 low_cpu_mem_usage=True,
             )
             self.vision_tower = siglip.vision_model       # SiglipVisionModel
             vision_hidden = siglip.config.vision_config.hidden_size  # 1152
 
-            print(f"Loading Language Model: {gemma_id} (FP16)...")
+            print(f"Loading Language Model: {gemma_id} (BF16)...")
             _full_lm = GemmaForCausalLM.from_pretrained(
                 gemma_id,
                 token=token,
-                torch_dtype=torch.float16,
+                torch_dtype=torch.bfloat16,
                 low_cpu_mem_usage=True,
             )
             # Normalize to inner GemmaModel so forward always uses .embed_tokens directly
@@ -92,8 +92,8 @@ class PaliGemmaBackbone(nn.Module):
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # 전체 FP16 (Jetson AGX 최적화)
-        self.half()
+        # BF16 (FP16은 NaN 유발 — BF16이 안정적)
+        self.bfloat16()
 
     # ─────────────────────────────────────────────────────────────────
     def forward(self, images: torch.Tensor, text_input=None) -> torch.Tensor:
@@ -107,11 +107,11 @@ class PaliGemmaBackbone(nn.Module):
             L: 텍스트 토큰 수 (max_text_len 이하)
         """
         B, N, C, H, W = images.shape
-        dtype  = images.dtype
+        dtype  = torch.bfloat16
         device = images.device
 
         # ── Step 1: 최신 프레임 → SigLIP 비전 인코딩 ─────────────────
-        frame = images[:, -1]  # (B, C, H, W)
+        frame = images[:, -1].to(dtype)  # (B, C, H, W)
         vis_out = self.vision_tower(frame)
         visual_feats  = vis_out.last_hidden_state.to(dtype)  # (B, T_vis, 1152)
 
