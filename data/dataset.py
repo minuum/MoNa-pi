@@ -98,6 +98,7 @@ class ActionChunkDataset(Dataset):
         transform=None,
         preprocess: bool = True,
         smooth: bool = True,
+        normalize: bool = False,   # Pi0 정통 방식: 모델 내부에서 정규화하므로 기본값 False
         inject_prefix: bool = True,
         use_delta: bool = False,
         augment: bool = False,
@@ -121,7 +122,7 @@ class ActionChunkDataset(Dataset):
         # 전처리 파이프라인 초기화
         self.preprocessor = EpisodePreprocessor(
             smooth=preprocess and smooth,
-            normalize=True,
+            normalize=normalize,
             inject_prefix=preprocess and inject_prefix,
             use_delta=preprocess and use_delta,
             use_counterfactual=use_counterfactual,
@@ -247,6 +248,7 @@ def build_train_val_split(
     window_size: int = 8,
     image_size: int = 384,
     preprocess: bool = True,
+    normalize: bool = False,
     augment: bool = False,
     use_color_jitter: bool = False,
     use_random_crop: bool = False,
@@ -266,6 +268,7 @@ def build_train_val_split(
         window_size=window_size,
         image_size=image_size,
         preprocess=preprocess,
+        normalize=normalize,
         augment=augment,
         use_color_jitter=use_color_jitter,
         use_random_crop=use_random_crop,
@@ -278,6 +281,7 @@ def build_train_val_split(
         window_size=window_size,
         image_size=image_size,
         preprocess=preprocess,
+        normalize=normalize,
         augment=False,
         use_color_jitter=False,
         use_random_crop=False,

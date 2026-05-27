@@ -22,6 +22,7 @@ data:
   image_size: 384        # SigLIP 입력 해상도
   preprocess: true       # ActionSmoother + IntentPrefix 활성화
   smooth: true
+  normalize: false       # true: 데이터셋에서 정규화 완료, false: 모델 내부에서 정규화 진행 (정통 pi0 방식)
   inject_prefix: true
   use_delta: false       # True: 속도→변위 변환 실험용
 

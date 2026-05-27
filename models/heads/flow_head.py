@@ -1,134 +1,180 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from einops import rearrange
-import math
 
-class SinusoidalPosEmb(nn.Module):
-    def __init__(self, dim):
+
+# ── 1. Timestep Embedder ──────────────────────────────────────────────────────
+
+class TimestepEmbedder(nn.Module):
+    """
+    Sinusoidal → MLP → (B, hidden_dim)
+    π0 논문 방식: DiT 동일
+    """
+
+    def __init__(self, hidden_dim: int):
         super().__init__()
-        self.dim = dim
+        self.hidden_dim = hidden_dim
+        self.mlp = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim * 4),
+            nn.SiLU(),
+            nn.Linear(hidden_dim * 4, hidden_dim),
+        )
 
-    def forward(self, x):
-        # Ensure x is at least 1D (Batch dimension)
-        if x.ndim == 0:
-            x = x.unsqueeze(0)
-        if x.ndim == 2:
-            x = x.squeeze(-1)
-            
-        device = x.device
-        dtype = x.dtype
-        half_dim = self.dim // 2
-        emb = math.log(10000) / (half_dim - 1)
-        emb = torch.exp(torch.arange(half_dim, device=device, dtype=dtype) * -emb)
-        emb = x.unsqueeze(-1) * emb.unsqueeze(0)
-        emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
-        return emb
+    def _sinusoidal(self, t: torch.Tensor) -> torch.Tensor:
+        # t: (B,) → (B, hidden_dim)
+        half = self.hidden_dim // 2
+        freqs = torch.exp(
+            -math.log(10000) * torch.arange(half, device=t.device, dtype=t.dtype) / (half - 1)
+        )
+        args = t[:, None] * freqs[None]          # (B, half)
+        return torch.cat([args.sin(), args.cos()], dim=-1)  # (B, hidden_dim)
+
+    def forward(self, t: torch.Tensor) -> torch.Tensor:
+        # t: (B,) or (B,1)
+        if t.ndim == 2:
+            t = t.squeeze(-1)
+        return self.mlp(self._sinusoidal(t))     # (B, hidden_dim)
+
+
+# ── 2. AdaLN Modulation ───────────────────────────────────────────────────────
+
+class AdaLNModulation(nn.Module):
+    """
+    cond_emb → (α1, β1, γ1, α2, β2, γ2)  각 (B, 1, hidden_dim)
+
+    Zero-init: 학습 초기 identity 보장 (DiT / π0 논문 방식)
+    self-attn + mlp 두 블록에 대한 scale/shift/gate
+    """
+
+    def __init__(self, hidden_dim: int):
+        super().__init__()
+        self.silu = nn.SiLU()
+        self.linear = nn.Linear(hidden_dim, 6 * hidden_dim)
+        # Zero-init
+        nn.init.zeros_(self.linear.weight)
+        nn.init.zeros_(self.linear.bias)
+
+    def forward(self, cond_emb: torch.Tensor):
+        # cond_emb: (B, hidden_dim)
+        out = self.linear(self.silu(cond_emb))         # (B, 6*hidden_dim)
+        chunks = out.chunk(6, dim=-1)                  # 6 × (B, hidden_dim)
+        return tuple(c.unsqueeze(1) for c in chunks)   # 6 × (B, 1, hidden_dim)
+
+
+# ── 3. FlowMatchingHead (π0 AdaLN-Zero) ──────────────────────────────────────
 
 class FlowMatchingHead(nn.Module):
     """
-    Advanced Flow Matching Action Head (MoNa-pi)
-    
-    특징:
-    - Sinusoidal Time Embedding
-    - Cross-Attention for VLM Condition
-    - Transformer Encoder for Action Sequence Modeling
+    π0 Action Expert — AdaLN-Zero 방식 Flow Matching Transformer
+
+    구조:
+        action_proj  : Linear(action_dim → hidden_dim)
+        timestep_emb : TimestepEmbedder  → cond_emb (B, hidden_dim)
+        cond_proj    : Linear(cond_dim → hidden_dim)  — VLM 토큰 차원 축소
+
+        N × Transformer Block (AdaLN-Zero):
+            self_attn  : action tokens 내부  + AdaLN (α1,β1,γ1)
+            cross_attn : action → VLM cond  (timestep 미적용)
+            mlp        : FFN                + AdaLN (α2,β2,γ2)
+
+        output_head  : Linear(hidden_dim → action_dim)
     """
+
     def __init__(
         self,
         input_dim: int,
-        action_dim: int = 3,         # linear_x, linear_y, angular_z
-        horizon: int = 10,           # V3 Standard Horizon (k=10)
+        action_dim: int = 3,
+        horizon: int = 10,
         hidden_dim: int = 512,
         n_layers: int = 4,
         n_heads: int = 8,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
-        self.input_dim = input_dim
         self.action_dim = action_dim
-        self.horizon = horizon
+        self.horizon    = horizon
         self.hidden_dim = hidden_dim
-        
-        # 1. Action & Time Embeddings
-        self.action_proj = nn.Linear(action_dim, hidden_dim)
-        self.time_mlp = nn.Sequential(
-            SinusoidalPosEmb(hidden_dim),
-            nn.Linear(hidden_dim, hidden_dim * 4),
-            nn.GELU(),
-            nn.Linear(hidden_dim * 4, hidden_dim)
-        )
-        
-        # 2. Condition Projection
-        self.cond_proj = nn.Linear(input_dim, hidden_dim)
-        
-        # 3. Transformer Blocks with Cross-Attention
-        # 간단한 구현을 위해 nn.MultiheadAttention과 Residual 사용
-        self.layers = nn.ModuleList([
-            nn.ModuleDict({
-                'self_attn': nn.MultiheadAttention(hidden_dim, n_heads, batch_first=True),
-                'cross_attn': nn.MultiheadAttention(hidden_dim, n_heads, batch_first=True),
-                'mlp': nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim * 4),
-                    nn.GELU(),
-                    nn.Linear(hidden_dim * 4, hidden_dim)
-                ),
-                'norm1': nn.LayerNorm(hidden_dim),
-                'norm2': nn.LayerNorm(hidden_dim),
-                'norm3': nn.LayerNorm(hidden_dim)
-            }) for _ in range(n_layers)
+
+        # Embeddings
+        self.action_proj    = nn.Linear(action_dim, hidden_dim)
+        self.timestep_emb   = TimestepEmbedder(hidden_dim)
+        self.cond_proj      = nn.Linear(input_dim, hidden_dim)
+
+        # Per-layer modules
+        self.self_attn_list  = nn.ModuleList([
+            nn.MultiheadAttention(hidden_dim, n_heads, batch_first=True)
+            for _ in range(n_layers)
         ])
-        
-        # 4. Output Head
+        self.cross_attn_list = nn.ModuleList([
+            nn.MultiheadAttention(hidden_dim, n_heads, batch_first=True)
+            for _ in range(n_layers)
+        ])
+        self.mlp_list = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(hidden_dim, hidden_dim * 4),
+                nn.GELU(),
+                nn.Linear(hidden_dim * 4, hidden_dim),
+            )
+            for _ in range(n_layers)
+        ])
+        self.norm1_list = nn.ModuleList([nn.LayerNorm(hidden_dim) for _ in range(n_layers)])
+        self.norm2_list = nn.ModuleList([nn.LayerNorm(hidden_dim) for _ in range(n_layers)])
+        self.norm3_list = nn.ModuleList([nn.LayerNorm(hidden_dim) for _ in range(n_layers)])
+        self.adaLN_mods = nn.ModuleList([AdaLNModulation(hidden_dim) for _ in range(n_layers)])
+
+        # Output
         self.output_head = nn.Linear(hidden_dim, action_dim)
 
-    def forward(self, x_t, t, cond):
+    # ─────────────────────────────────────────────────────────────────────────
+    def forward(self, x_t: torch.Tensor, t: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x_t: (B, horizon, action_dim)
-            t: (B, 1) or (B,)
-            cond: (B, n_tokens, input_dim)
+            x_t  : (B, horizon, action_dim)
+            t    : (B,) or (B, 1)
+            cond : (B, T_vlm, input_dim)
+        Returns:
+            v_pred : (B, horizon, action_dim)
         """
-        B, H, D = x_t.shape
-        
-        # Embed Time & Action
-        t_emb = self.time_mlp(t.squeeze(-1)).unsqueeze(1) # (B, 1, hidden_dim)
-        h = self.action_proj(x_t) + t_emb # (B, H, hidden_dim)
-        
-        # Embed Condition
-        c = self.cond_proj(cond) # (B, n_tokens, hidden_dim)
-        
-        # Transformer Layers
-        for layer in self.layers:
-            # Self-Attention on Action Sequence
-            attn_out, _ = layer['self_attn'](layer['norm1'](h), h, h)
-            h = h + attn_out
-            
-            # Cross-Attention on VLM Features
-            cross_out, _ = layer['cross_attn'](layer['norm2'](h), c, c)
-            h = h + cross_out
-            
-            # MLP
-            h = h + layer['mlp'](layer['norm3'](h))
-            
-        return self.output_head(h) # (B, H, D)
+        # 1. Embed
+        h         = self.action_proj(x_t)           # (B, H, hidden_dim)
+        cond_emb  = self.timestep_emb(t)             # (B, hidden_dim)
+        c         = self.cond_proj(cond)              # (B, T_vlm, hidden_dim)
 
-    def get_loss(self, x_1, cond):
+        # 2. Transformer blocks
+        for i in range(len(self.self_attn_list)):
+            α1, β1, γ1, α2, β2, γ2 = self.adaLN_mods[i](cond_emb)
+
+            # Self-Attention (AdaLN-Zero)
+            q = self.norm1_list[i](h) * (1 + α1) + β1
+            attn_out, _ = self.self_attn_list[i](q, q, q)
+            h = h + γ1 * attn_out
+
+            # Cross-Attention (timestep 미적용 — VLM cond 그대로)
+            cross_out, _ = self.cross_attn_list[i](self.norm2_list[i](h), c, c)
+            h = h + cross_out
+
+            # MLP (AdaLN-Zero)
+            h = h + γ2 * self.mlp_list[i](self.norm3_list[i](h) * (1 + α2) + β2)
+
+        return self.output_head(h)                   # (B, H, action_dim)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    def get_loss(self, x_1: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
         """
-        Flow Matching Loss (Conditional Flow Matching)
+        Conditional Flow Matching loss.
+        x_t = (1-t)*x_0 + t*x_1,  v_target = x_1 - x_0
         """
-        B = x_1.shape[0]
+        B      = x_1.shape[0]
         device = x_1.device
-        dtype = x_1.dtype
-        
-        t = torch.rand(B, 1, device=device, dtype=dtype)
-        x_0 = torch.randn_like(x_1)
-        
-        # x_t = (1-t)x_0 + t*x_1
-        t_expand = t.view(B, 1, 1)
-        x_t = (1 - t_expand) * x_0 + t_expand * x_1
-        
+        dtype  = x_1.dtype
+
+        t       = torch.rand(B, device=device, dtype=dtype)          # (B,)
+        x_0     = torch.randn_like(x_1)
+
+        t_exp   = t.view(B, 1, 1)
+        x_t     = (1 - t_exp) * x_0 + t_exp * x_1
         v_target = x_1 - x_0
-        v_pred = self.forward(x_t, t, cond)
-        
+
+        v_pred  = self.forward(x_t, t, cond)
         return F.mse_loss(v_pred, v_target)

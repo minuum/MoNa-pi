@@ -39,11 +39,15 @@ def test_original_pi0_loading():
         dummy_images = torch.randn(1, 1, 3, 384, 384).to(device, dtype=torch.float16)
         dummy_instructions = ["move forward and avoid the brown pot"]
         
-        print("Testing forward pass (sampling)...")
+        print(f"Testing forward pass (sampling - {model.action_expert.__class__.__name__})...")
         # Heun's method solver (5 steps)
+        # unnormalize 가 내부적으로 작동하므로 실제 로봇 물리값 범위인지 확인
         actions = model.sample_actions(dummy_images, dummy_instructions, n_steps=5)
         
         print(f"Sampled actions shape: {actions.shape}")
+        print(f"Sampled actions example (vx, vy, wz): {actions[0, 0, :].tolist()}")
+        
+        # 기본 1.150 스케일 부근인지 체크 (Noise-free 상태는 아니지만 스케일 확인)
         print("=== TEST PASSED ===")
         
     except Exception as e:

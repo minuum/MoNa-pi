@@ -191,6 +191,7 @@ def train(config_path: str):
         window_size=cfg["data"]["window_size"],
         image_size=cfg["data"].get("image_size", 384),
         preprocess=cfg["data"].get("preprocess", True),
+        normalize=cfg["data"].get("normalize", False),  # Pi0 정통: 모델 내 정규화 위해 dataset은 False가 기본
         augment=cfg["data"].get("augment", False),
         use_color_jitter=cfg["data"].get("use_color_jitter", False),
         use_random_crop=cfg["data"].get("use_random_crop", False),

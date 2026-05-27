@@ -51,9 +51,9 @@ class Pi0VLA(nn.Module):
 
         cond_dim = self.backbone.lang_hidden_size  # 2048
 
-        # ── 2. Action Expert (= π0 Action Expert) ────────────────────
-        from .heads.action_expert import ActionExpert
-        self.action_expert = ActionExpert(
+        # ── 2. MoNa-pi Action Expert (SOTA-ready) ────────────────────
+        from .heads.mona_action_expert import MoNaActionExpert
+        self.action_expert = MoNaActionExpert(
             action_dim=action_dim,
             horizon=horizon,
             hidden_dim=hidden_dim,
@@ -84,8 +84,8 @@ class Pi0VLA(nn.Module):
         actions_gt: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Flow Matching 학습 손실.
-        fp32 DataLoader 텐서도 모델 dtype(fp16)으로 자동 캐스팅.
+        MoNa-pi Flow Matching 학습 손실. 
+        MoNaActionExpert 내부에서 actions_gt 정규화 후 Loss 계산.
         """
         model_dtype = next(self.parameters()).dtype
         images     = images.to(dtype=model_dtype)
@@ -102,10 +102,10 @@ class Pi0VLA(nn.Module):
         n_steps: int = 5,
     ) -> torch.Tensor:
         """
-        Heun's method ODE solver로 액션 청크 샘플링.
+        Heun's method ODE solver로 액션 청크 샘플링 및 역정규화.
 
         Returns:
-            x_t: (B, horizon, action_dim)
+            x_raw: (B, horizon, action_dim) - 실제 로봇 물리값 (vx, vy, wz)
         """
         model_dtype = next(self.parameters()).dtype
         images = images.to(dtype=model_dtype)
@@ -115,7 +115,7 @@ class Pi0VLA(nn.Module):
         cond = self.forward_backbone(images, instructions)
         B    = cond.shape[0]
 
-        # 초기 노이즈
+        # 초기 노이즈 (정규화된 공간)
         x_t = torch.randn(
             B, self.action_expert.horizon, self.action_expert.action_dim,
             device=device, dtype=dtype,
@@ -137,4 +137,7 @@ class Pi0VLA(nn.Module):
 
             x_t = x_t + (v_t + v_next) * 0.5 * dt
 
-        return x_t
+        # [Important] 역정규화: 모델 출력(~1.0) -> 로봇 물리값(1.150 등)
+        x_raw = self.action_expert.unnormalize(x_t)
+
+        return x_raw
