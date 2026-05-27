@@ -50,9 +50,10 @@ class PaliGemmaBackbone(nn.Module):
                 torch_dtype=torch.float16,
                 low_cpu_mem_usage=True,
             )
-            self.vision_tower = pg.model.vision_tower          # SiglipVisionModel
-            self.projector    = pg.model.multi_modal_projector  # Linear(1152→2048)
-            self.language_model = pg.model.language_model       # GemmaForCausalLM
+            self.vision_tower = pg.model.vision_tower            # SiglipVisionModel
+            self.projector    = pg.model.multi_modal_projector   # Linear(1152→2048)
+            # pg.model.language_model is already GemmaModel (inner), not GemmaForCausalLM
+            self.language_model = pg.model.language_model
             self.tokenizer = AutoTokenizer.from_pretrained(paligemma_id, token=token)
 
         else:
@@ -68,13 +69,15 @@ class PaliGemmaBackbone(nn.Module):
             vision_hidden = siglip.config.vision_config.hidden_size  # 1152
 
             print(f"Loading Language Model: {gemma_id} (FP16)...")
-            self.language_model = GemmaForCausalLM.from_pretrained(
+            _full_lm = GemmaForCausalLM.from_pretrained(
                 gemma_id,
                 token=token,
                 torch_dtype=torch.float16,
                 low_cpu_mem_usage=True,
             )
-            lang_hidden = self.language_model.config.hidden_size  # 2048
+            # Normalize to inner GemmaModel so forward always uses .embed_tokens directly
+            self.language_model = _full_lm.model
+            lang_hidden = _full_lm.config.hidden_size  # 2048
 
             # PaliGemma 방식 projector: Linear(1152→2048), Xavier 초기화
             self.projector = nn.Linear(vision_hidden, lang_hidden, bias=True)
@@ -128,7 +131,7 @@ class PaliGemmaBackbone(nn.Module):
             input_ids = enc.input_ids.to(device)
             text_mask = enc.attention_mask.to(device)
 
-            text_embeds = self.language_model.model.embed_tokens(input_ids).to(dtype)
+            text_embeds = self.language_model.embed_tokens(input_ids).to(dtype)
             # (B, L, 2048)
 
             combined      = torch.cat([visual_embeds, text_embeds], dim=1)
@@ -141,7 +144,7 @@ class PaliGemmaBackbone(nn.Module):
             combined_mask = torch.ones(B, T_vis, device=device, dtype=torch.long)
 
         # ── Step 4: Gemma transformer (인코더 모드, causal mask 없음) ─
-        out = self.language_model.model(
+        out = self.language_model(
             inputs_embeds=combined,
             attention_mask=combined_mask,
         )
