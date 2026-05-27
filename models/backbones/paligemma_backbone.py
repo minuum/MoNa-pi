@@ -50,9 +50,9 @@ class PaliGemmaBackbone(nn.Module):
                 torch_dtype=torch.float16,
                 low_cpu_mem_usage=True,
             )
-            self.vision_tower = pg.vision_tower          # SiglipVisionModel
-            self.projector    = pg.multi_modal_projector  # Linear(1152→2048)
-            self.language_model = pg.language_model       # GemmaForCausalLM
+            self.vision_tower = pg.model.vision_tower          # SiglipVisionModel
+            self.projector    = pg.model.multi_modal_projector  # Linear(1152→2048)
+            self.language_model = pg.model.language_model       # GemmaForCausalLM
             self.tokenizer = AutoTokenizer.from_pretrained(paligemma_id, token=token)
 
         else:
