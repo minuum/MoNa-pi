@@ -61,8 +61,8 @@ class Pi0VLA(nn.Module):
         )
 
 
-        # ── 3. 전체 FP16 (Jetson AGX) ─────────────────────────────────
-        self.half()
+        # BF16 (FP16은 NaN 유발)
+        self.bfloat16()
 
     # ─────────────────────────────────────────────────────────────────
     def forward_backbone(self, images: torch.Tensor, instructions) -> torch.Tensor:

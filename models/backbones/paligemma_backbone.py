@@ -107,7 +107,7 @@ class PaliGemmaBackbone(nn.Module):
             L: 텍스트 토큰 수 (max_text_len 이하)
         """
         B, N, C, H, W = images.shape
-        dtype  = torch.bfloat16
+        dtype  = next(self.parameters()).dtype  # backbone dtype (BF16)
         device = images.device
 
         # ── Step 1: 최신 프레임 → SigLIP 비전 인코딩 ─────────────────
