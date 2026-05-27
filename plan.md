@@ -90,9 +90,16 @@ loss = MSE(v_pred, v_target)
 
 ---
 
-## [ ] 구현 체크리스트
-- [ ] `TimestepEmbedder` 클래스
-- [ ] `AdaLNModulation` 클래스 (Zero-init)
-- [ ] `FlowMatchingHead.__init__`: `adaLN_mods` ModuleList 추가
-- [ ] `FlowMatchingHead.forward`: AdaLN 적용 블록으로 교체
-- [ ] typecheck 통과 확인
+## [x] 구현 체크리스트 (커밋 144d3b1 완료)
+- [x] `TimestepEmbedder` 클래스
+- [x] `AdaLNModulation` 클래스 (Zero-init)
+- [x] `FlowMatchingHead.__init__`: `adaLN_mods` ModuleList 추가
+- [x] `FlowMatchingHead.forward`: AdaLN 적용 블록으로 교체
+- [x] `MoNaActionExpert` 정규화 래퍼 (`mona_action_expert.py`)
+- [x] `verify_mona_expert.py` 수치 정합성 검증 통과
+- [x] `configs/train.yaml` 데이터 경로 수정 (GX10)
+
+## [ ] 다음 작업
+- [ ] AdaLN-Zero 학습 실행 → 중간발표 loss curve 확보
+- [ ] v3a best vs AdaLN-Zero 성능 비교
+- [ ] 중간발표 슬라이드 업데이트

@@ -9,17 +9,17 @@ model:
 
   # PaliGemma 백본 설정 (π0 논문 방식)
   use_paligemma: true
-  load_pretrained_paligemma: false  # true: HF에서 paligemma-3b 다운로드
+  load_pretrained_paligemma: true   # 로컬 캐시: paligemma-3b-pt-224 사용
   paligemma_id: "google/paligemma-3b-pt-224"
   vision_model_id: "google/siglip-so400m-patch14-384"
   lang_model_id: "google/gemma-2b"
 
 data:
   # v5 데이터셋 경로 (실제 경로로 변경)
-  train_path: /home/soda/MoNaVLA/ROS_action/mobile_vla_dataset_v5/
+  train_path: /home/minum/minum/26CS/MoNa-pi/mobile_vla_dataset_v5/
   val_split: 0.1         # 전체 중 10%를 검증용으로
   window_size: 8         # 이미지 이력 윈도우
-  image_size: 384        # SigLIP 입력 해상도
+  image_size: 224        # paligemma-3b-pt-224 입력 해상도
   preprocess: true       # ActionSmoother + IntentPrefix 활성화
   smooth: true
   normalize: false       # true: 데이터셋에서 정규화 완료, false: 모델 내부에서 정규화 진행 (정통 pi0 방식)
