@@ -36,3 +36,21 @@ checkpoints/
 *.pth
 *.safetensors
 .env
+
+# Virtual environment
+.venv/
+
+# Training logs & runtime outputs
+logs/
+eval_output.log
+*.log
+
+# Generated report binaries (re-buildable via make_pptx.py)
+reports/*.pptx
+reports/*.pdf
+reports/fonts/
+reports/sample_imgs/
+reports/attention_backbone_v2.json/
+
+# HuggingFace cache
+.cache/
