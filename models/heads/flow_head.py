@@ -31,10 +31,11 @@ class TimestepEmbedder(nn.Module):
         return torch.cat([args.sin(), args.cos()], dim=-1)  # (B, hidden_dim)
 
     def forward(self, t: torch.Tensor) -> torch.Tensor:
-        # t: (B,) or (B,1)
+        # t: (B,) or (B,1) — 모델 dtype으로 캐스팅 (float32 입력 허용)
         if t.ndim == 2:
             t = t.squeeze(-1)
-        return self.mlp(self._sinusoidal(t))     # (B, hidden_dim)
+        dtype = next(self.mlp.parameters()).dtype
+        return self.mlp(self._sinusoidal(t.to(dtype)))  # (B, hidden_dim)
 
 
 # ── 2. AdaLN Modulation ───────────────────────────────────────────────────────

@@ -8,10 +8,10 @@ MoNa-pi FastAPI 추론 서버
 
 실행:
     python inference/server.py \
-        --ckpt  checkpoints/best \
-        --host  0.0.0.0 \
-        --port  8080 \
-        --steps 5
+        --config configs/serbot2.yaml \
+        --ckpt   checkpoints/best \
+        --host   0.0.0.0 \
+        --port   8080
 
 의존성:
     pip install fastapi uvicorn pydantic numpy pillow
@@ -28,6 +28,7 @@ from pathlib import Path
 
 import numpy as np
 import uvicorn
+import yaml
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -142,14 +143,23 @@ async def predict(req: PredictRequest):
 # 서버 시작
 # ─────────────────────────────────────────────
 
-def build_engine(args) -> MoNaPiEngine:
+def build_engine(args, cfg: dict) -> MoNaPiEngine:
+    m = cfg.get("model", {})
+    d = cfg.get("data", {})
     engine = MoNaPiEngine(
         model_path=args.ckpt,
         device=args.device,
         solver=args.solver,
         n_ode_steps=args.steps,
-        use_paligemma=not args.legacy_backbone,
-        load_pretrained_paligemma=args.pretrained_paligemma,
+        action_dim=m.get("action_dim", 3),
+        horizon=m.get("horizon", 10),
+        hidden_dim=m.get("hidden_dim", 512),
+        use_paligemma=m.get("use_paligemma", True),
+        load_pretrained_paligemma=m.get("load_pretrained_paligemma", False),
+        paligemma_id=m.get("paligemma_id", "google/paligemma-3b-pt-224"),
+        vision_model_id=m.get("vision_model_id", "google/siglip-so400m-patch14-384"),
+        lang_model_id=m.get("lang_model_id", "google/gemma-2b"),
+        image_size=d.get("image_size", 224),
     )
     engine.warmup()
     return engine
@@ -157,26 +167,26 @@ def build_engine(args) -> MoNaPiEngine:
 
 def main():
     parser = argparse.ArgumentParser(description="MoNa-pi 추론 서버")
-    parser.add_argument("--ckpt",   default="checkpoints/best", help="체크포인트 경로")
+    parser.add_argument("--config", default="configs/train.yaml", help="모델/데이터 설정 YAML")
+    parser.add_argument("--ckpt",   default="checkpoints/best",   help="체크포인트 경로")
     parser.add_argument("--host",   default="0.0.0.0")
     parser.add_argument("--port",   type=int, default=8080)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--solver", default="heun", choices=["euler", "heun", "dpm"])
     parser.add_argument("--steps",  type=int, default=5, help="ODE 스텝 수")
-    parser.add_argument("--legacy-backbone",     action="store_true",
-                        help="이전 Pi0Backbone 사용 (use_paligemma=False)")
-    parser.add_argument("--pretrained-paligemma", action="store_true",
-                        help="google/paligemma-3b-pt-224 다운로드 사용")
     parser.add_argument("--mock",   action="store_true",
                         help="모델 로드 없이 0 액션 반환 (통합 테스트용)")
     args = parser.parse_args()
+
+    with open(args.config) as f:
+        cfg = yaml.safe_load(f)
 
     global _engine, _mock_mode
     _mock_mode = args.mock
     if _mock_mode:
         print("[Server] MOCK 모드 — 모델 로드 없이 실행")
     else:
-        _engine = build_engine(args)
+        _engine = build_engine(args, cfg)
 
     print(f"[Server] 서버 시작: http://{args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

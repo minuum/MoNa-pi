@@ -1,0 +1,23 @@
+# MoNa-pi 배포 설정 — Serbot2 (6/4 데모)
+# python inference/server.py --config configs/serbot2.yaml --ckpt checkpoints/best
+
+model:
+  action_dim: 3              # (linear_x, linear_y, angular_z)
+  horizon: 10
+  hidden_dim: 512
+  use_paligemma: true
+  load_pretrained_paligemma: true
+  paligemma_id: "google/paligemma-3b-pt-224"
+  vision_model_id: "google/siglip-so400m-patch14-384"
+  lang_model_id: "google/gemma-2b"
+
+data:
+  image_size: 224            # PaliGemma 입력 해상도
+  normalize: false           # 모델 내부(MoNaActionExpert)에서 정규화
+
+robot:
+  image_topic: /cam_high/image_raw
+  cmd_vel_topic: /cmd_vel
+  control_hz: 10             # 10Hz 제어 루프
+  replan_ratio: 0.5          # 50% 소진 시 재계획
+  n_ode_steps: 5             # Heun ODE 스텝 수 (속도-정확도 트레이드오프)

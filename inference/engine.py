@@ -3,7 +3,7 @@ MoNa-pi 추론 엔진
 
 특징:
     - 비전 특징 캐싱: 같은 이미지 프레임 반복 요청 시 백본 재계산 생략
-    - FP16 일관 유지 (Jetson AGX 최적화)
+    - BF16 일관 유지 (FP16은 NaN 유발)
     - 교체 가능한 ODE 솔버 (euler / heun / dpm)
     - 전처리(정규화) + 후처리(역정규화) 내장
 
@@ -67,6 +67,7 @@ class MoNaPiEngine:
         vision_model_id: str = "google/siglip-so400m-patch14-384",
         lang_model_id: str = "google/gemma-2b",
         paligemma_id: str = "google/paligemma-3b-pt-224",
+        image_size: int = 224,
         cache_vision: bool = True,
     ):
         self.model_path = Path(model_path)
@@ -82,9 +83,7 @@ class MoNaPiEngine:
         self.lang_model_id = lang_model_id
         self.paligemma_id = paligemma_id
         self.cache_vision = cache_vision
-
-        # 입력 해상도: 로컬 SigLIP=384, 실제 PaliGemma=224
-        self.IMG_SIZE = 224 if load_pretrained_paligemma else 384
+        self.IMG_SIZE = image_size
 
         self.model: Optional[Pi0VLA] = None
         self.normalizer = ActionNormalizer()
@@ -98,7 +97,7 @@ class MoNaPiEngine:
     # ──────────────────────────────────────────
 
     def warmup(self):
-        """모델 로드 + FP16 변환 + 더미 추론으로 CUDA 커널 예열"""
+        """모델 로드 + 더미 추론으로 CUDA 커널 예열"""
         print(f"[Engine] 모델 로드 중: {self.model_path}")
         self.model = Pi0VLA(
             action_dim=self.action_dim,
@@ -124,7 +123,7 @@ class MoNaPiEngine:
         else:
             print(f"[Engine] 경고: 가중치 파일 없음, 랜덤 가중치 사용")
 
-        self.model = self.model.to(self.device).half().eval()
+        self.model = self.model.to(self.device).eval()
 
         # 더미 추론 (CUDA 워밍업)
         dummy_img = np.zeros((self.IMG_SIZE, self.IMG_SIZE, 3), dtype=np.uint8)
@@ -145,7 +144,7 @@ class MoNaPiEngine:
         pil = PILImage.fromarray(image).resize((self.IMG_SIZE, self.IMG_SIZE))
         arr = np.array(pil).transpose(2, 0, 1).astype(np.float32) / 255.0
         t = torch.from_numpy(arr).unsqueeze(0).unsqueeze(0)  # (1, 1, 3, H, W)
-        return t.to(self.device).half()
+        return t.to(self.device)  # backbone이 자체 dtype으로 캐스팅
 
     def _image_hash(self, image: np.ndarray) -> str:
         return hashlib.md5(image.tobytes()).hexdigest()
