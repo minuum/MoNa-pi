@@ -2,11 +2,15 @@
 # MoNa-pi 빠른 시작 스크립트 (5/29 Serbot2 테스트용)
 #
 # 사용법:
-#   ./start.sh                        # 전체 스택 (hybrid 모드)
-#   ./start.sh server                 # 추론 서버만
+#   ./start.sh                        # 전체 스택 (hybrid 모드, INT8 온보드)
+#   ./start.sh server                 # 추론 서버만 (Serbot2 온보드)
 #   ./start.sh manual                 # 수동 키보드만
 #   ./start.sh vla                    # VLA 자동 (서버는 별도 실행)
-#   SERVER_URL=http://192.168.x.x:8080 ./start.sh vla  # 원격 서버
+#
+# Serbot2 온보드 INT8 추론 (스왑 필요):
+#   configs/serbot2.yaml 의 use_int8: true 로 BF16 ~6GB → INT8 ~3GB
+#   sudo fallocate -l 8G /swapfile && sudo chmod 600 /swapfile
+#   sudo mkswap /swapfile && sudo swapon /swapfile
 
 set -e
 

@@ -10,6 +10,9 @@ model:
   paligemma_id: "google/paligemma-3b-pt-224"
   vision_model_id: "google/siglip-so400m-patch14-384"
   lang_model_id: "google/gemma-2b"
+  # Serbot2 온보드 메모리 절약: BF16 ~6GB → INT8 ~3GB (MoNaVLA monavla-driving 방식)
+  # bitsandbytes 필요: pip install bitsandbytes
+  use_int8: true
 
 data:
   image_size: 224            # PaliGemma 입력 해상도

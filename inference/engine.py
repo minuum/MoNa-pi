@@ -16,6 +16,7 @@ MoNa-pi 추론 엔진
 
 from __future__ import annotations
 
+import gc
 import hashlib
 import sys
 import time
@@ -64,6 +65,7 @@ class MoNaPiEngine:
         hidden_dim: int = 512,
         use_paligemma: bool = True,
         load_pretrained_paligemma: bool = False,
+        use_int8: bool = False,
         vision_model_id: str = "google/siglip-so400m-patch14-384",
         lang_model_id: str = "google/gemma-2b",
         paligemma_id: str = "google/paligemma-3b-pt-224",
@@ -79,6 +81,7 @@ class MoNaPiEngine:
         self.hidden_dim = hidden_dim
         self.use_paligemma = use_paligemma
         self.load_pretrained_paligemma = load_pretrained_paligemma
+        self.use_int8 = use_int8
         self.vision_model_id = vision_model_id
         self.lang_model_id = lang_model_id
         self.paligemma_id = paligemma_id
@@ -105,25 +108,36 @@ class MoNaPiEngine:
             hidden_dim=self.hidden_dim,
             use_paligemma=self.use_paligemma,
             load_pretrained_paligemma=self.load_pretrained_paligemma,
+            use_int8=self.use_int8,
             vision_model_id=self.vision_model_id,
             lang_model_id=self.lang_model_id,
             paligemma_id=self.paligemma_id,
         )
 
-        # Accelerate 저장 형식 로드
+        # Accelerate 저장 형식 로드 (CPU → 필터링 → GPU, MoNaVLA lean-loading 방식)
         bin_path = self.model_path / "pytorch_model.bin"
         sf_path  = self.model_path / "model.safetensors"
         if bin_path.exists():
-            state = torch.load(bin_path, map_location="cpu")
+            state = torch.load(bin_path, map_location="cpu", weights_only=True)
             self.model.load_state_dict(state, strict=False)
+            del state; gc.collect()
         elif sf_path.exists():
             from safetensors.torch import load_file
-            state = load_file(str(sf_path))
+            state = load_file(str(sf_path), device="cpu")
             self.model.load_state_dict(state, strict=False)
+            del state; gc.collect()
         else:
             print(f"[Engine] 경고: 가중치 파일 없음, 랜덤 가중치 사용")
 
-        self.model = self.model.to(self.device).eval()
+        # INT8 모델은 device 이동 시 to()가 아닌 cuda() 사용 (BnB 요구사항)
+        if self.use_int8:
+            self.model.action_expert = self.model.action_expert.to(self.device)
+            self.model.eval()
+        else:
+            self.model = self.model.to(self.device).eval()
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         # 더미 추론 (CUDA 워밍업)
         dummy_img = np.zeros((self.IMG_SIZE, self.IMG_SIZE, 3), dtype=np.uint8)

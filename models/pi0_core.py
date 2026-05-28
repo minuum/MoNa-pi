@@ -23,6 +23,7 @@ class Pi0VLA(nn.Module):
         hidden_dim: int = 512,
         use_paligemma: bool = True,
         load_pretrained_paligemma: bool = False,
+        use_int8: bool = False,
         vision_model_id: str = "google/siglip-so400m-patch14-384",
         lang_model_id: str = "google/gemma-2b",
         paligemma_id: str = "google/paligemma-3b-pt-224",
@@ -39,6 +40,7 @@ class Pi0VLA(nn.Module):
                 siglip_id=vision_model_id,
                 gemma_id=lang_model_id,
                 load_pretrained_paligemma=load_pretrained_paligemma,
+                use_int8=use_int8,
                 max_text_len=kwargs.get("max_text_len", 48),
             )
         else:
@@ -61,8 +63,9 @@ class Pi0VLA(nn.Module):
         )
 
 
-        # BF16 (FP16은 NaN 유발)
-        self.bfloat16()
+        # INT8 모델은 bfloat16() 재캐스팅 금지
+        if not use_int8:
+            self.bfloat16()
 
     # ─────────────────────────────────────────────────────────────────
     def forward_backbone(self, images: torch.Tensor, instructions) -> torch.Tensor:

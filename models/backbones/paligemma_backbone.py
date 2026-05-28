@@ -1,3 +1,4 @@
+import gc
 import os
 import torch
 import torch.nn as nn
@@ -33,53 +34,64 @@ class PaliGemmaBackbone(nn.Module):
         siglip_id: str = "google/siglip-so400m-patch14-384",
         gemma_id: str = "google/gemma-2b",
         load_pretrained_paligemma: bool = False,
+        use_int8: bool = False,
         max_text_len: int = 48,
         **kwargs,
     ):
         super().__init__()
         self.max_text_len = max_text_len
+        self.use_int8 = use_int8
         token = os.getenv("HF_TOKEN")
+
+        # INT8: BitsAndBytes 양자화 설정 (MoNaVLA monavla-driving 방식)
+        # BF16 6GB → INT8 약 3GB, Serbot2 스왑 환경에서 안정 동작
+        bnb_config = None
+        if use_int8:
+            from transformers import BitsAndBytesConfig
+            bnb_config = BitsAndBytesConfig(load_in_8bit=True, llm_int8_threshold=6.0)
 
         if load_pretrained_paligemma:
             # ── Real PaliGemma: 공동 사전학습 가중치 ─────────────────
             from transformers import PaliGemmaForConditionalGeneration
-            print(f"Loading PaliGemma: {paligemma_id} (BF16)...")
-            pg = PaliGemmaForConditionalGeneration.from_pretrained(
-                paligemma_id,
-                token=token,
-                torch_dtype=torch.bfloat16,
-                low_cpu_mem_usage=True,
-            )
-            self.vision_tower = pg.model.vision_tower            # SiglipVisionModel
-            self.projector    = pg.model.multi_modal_projector   # Linear(1152→2048)
-            # pg.model.language_model is already GemmaModel (inner), not GemmaForCausalLM
+            dtype_str = "INT8" if use_int8 else "BF16"
+            print(f"Loading PaliGemma: {paligemma_id} ({dtype_str})...")
+            kwargs_pg = dict(token=token, low_cpu_mem_usage=True)
+            if use_int8:
+                kwargs_pg["quantization_config"] = bnb_config
+            else:
+                kwargs_pg["torch_dtype"] = torch.bfloat16
+            pg = PaliGemmaForConditionalGeneration.from_pretrained(paligemma_id, **kwargs_pg)
+            self.vision_tower   = pg.model.vision_tower
+            self.projector      = pg.model.multi_modal_projector
             self.language_model = pg.model.language_model
             self.tokenizer = AutoTokenizer.from_pretrained(paligemma_id, token=token)
+            del pg; gc.collect()
 
         else:
             # ── 로컬 캐시: SigLIP + Gemma 별도 로드 ──────────────────
-            print(f"Loading Vision Tower: {siglip_id} (BF16)...")
-            siglip = AutoModel.from_pretrained(
-                siglip_id,
-                token=token,
-                torch_dtype=torch.bfloat16,
-                low_cpu_mem_usage=True,
-            )
-            self.vision_tower = siglip.vision_model       # SiglipVisionModel
-            vision_hidden = siglip.config.vision_config.hidden_size  # 1152
+            dtype_str = "INT8" if use_int8 else "BF16"
+            print(f"Loading Vision Tower: {siglip_id} ({dtype_str})...")
+            kw_vis = dict(token=token, low_cpu_mem_usage=True)
+            if use_int8:
+                kw_vis["quantization_config"] = bnb_config
+            else:
+                kw_vis["torch_dtype"] = torch.bfloat16
+            siglip = AutoModel.from_pretrained(siglip_id, **kw_vis)
+            self.vision_tower = siglip.vision_model
+            vision_hidden = siglip.config.vision_config.hidden_size
+            del siglip; gc.collect()
 
-            print(f"Loading Language Model: {gemma_id} (BF16)...")
-            _full_lm = GemmaForCausalLM.from_pretrained(
-                gemma_id,
-                token=token,
-                torch_dtype=torch.bfloat16,
-                low_cpu_mem_usage=True,
-            )
-            # Normalize to inner GemmaModel so forward always uses .embed_tokens directly
+            print(f"Loading Language Model: {gemma_id} ({dtype_str})...")
+            kw_lm = dict(token=token, low_cpu_mem_usage=True)
+            if use_int8:
+                kw_lm["quantization_config"] = bnb_config
+            else:
+                kw_lm["torch_dtype"] = torch.bfloat16
+            _full_lm = GemmaForCausalLM.from_pretrained(gemma_id, **kw_lm)
             self.language_model = _full_lm.model
-            lang_hidden = _full_lm.config.hidden_size  # 2048
+            lang_hidden = _full_lm.config.hidden_size
+            del _full_lm; gc.collect()
 
-            # PaliGemma 방식 projector: Linear(1152→2048), Xavier 초기화
             self.projector = nn.Linear(vision_hidden, lang_hidden, bias=True)
             nn.init.xavier_uniform_(self.projector.weight)
             nn.init.zeros_(self.projector.bias)
@@ -92,8 +104,9 @@ class PaliGemmaBackbone(nn.Module):
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # BF16 (FP16은 NaN 유발 — BF16이 안정적)
-        self.bfloat16()
+        # INT8 모델은 bfloat16() 재캐스팅 금지 (이미 양자화됨)
+        if not use_int8:
+            self.bfloat16()
 
     # ─────────────────────────────────────────────────────────────────
     def forward(self, images: torch.Tensor, text_input=None) -> torch.Tensor:

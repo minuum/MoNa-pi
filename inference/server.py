@@ -156,6 +156,7 @@ def build_engine(args, cfg: dict) -> MoNaPiEngine:
         hidden_dim=m.get("hidden_dim", 512),
         use_paligemma=m.get("use_paligemma", True),
         load_pretrained_paligemma=m.get("load_pretrained_paligemma", False),
+        use_int8=m.get("use_int8", False),
         paligemma_id=m.get("paligemma_id", "google/paligemma-3b-pt-224"),
         vision_model_id=m.get("vision_model_id", "google/siglip-so400m-patch14-384"),
         lang_model_id=m.get("lang_model_id", "google/gemma-2b"),
