@@ -2,12 +2,16 @@
 MoNa-pi ROS2 런치 파일
 
 실행:
-    ros2 launch robot/launch/mona_pi.launch.py \
-        instruction:="장애물을 피해 직진" \
-        ckpt:="checkpoints/best"
+    # 전체 스택 (카메라 + 추론서버 + 컨트롤러 + 키보드)
+    ros2 launch robot/launch/mona_pi.launch.py
+
+    # VLA 자동 모드
+    ros2 launch robot/launch/mona_pi.launch.py mode:=vla instruction:="직진해"
+
+    # 추론 서버 없이 수동만 (테스트)
+    ros2 launch robot/launch/mona_pi.launch.py inference:=false mode:=manual
 """
 
-import subprocess
 import sys
 from launch import LaunchDescription
 from launch.actions import (
@@ -15,40 +19,39 @@ from launch.actions import (
     ExecuteProcess,
     RegisterEventHandler,
     LogInfo,
+    GroupAction,
 )
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    # ── 런치 인수 선언 ─────────────────────────────────────────────
-    instruction_arg = DeclareLaunchArgument(
-        "instruction",
-        default_value="Navigate to the goal",
-        description="자연어 주행 지시어",
-    )
-    ckpt_arg = DeclareLaunchArgument(
-        "ckpt",
-        default_value="checkpoints/best",
-        description="MoNa-pi 체크포인트 경로",
-    )
-    server_url_arg = DeclareLaunchArgument(
-        "server_url",
-        default_value="http://localhost:8080",
-        description="추론 서버 URL",
-    )
-    control_hz_arg = DeclareLaunchArgument(
-        "control_hz",
-        default_value="10.0",
-        description="cmd_vel 발행 주파수 (Hz)",
-    )
+    # ── 런치 인수 ────────────────────────────────────────────────────
+    args = [
+        DeclareLaunchArgument("instruction", default_value="Navigate to the goal"),
+        DeclareLaunchArgument("config",      default_value="configs/serbot2.yaml",
+                              description="모델/배포 설정 YAML"),
+        DeclareLaunchArgument("ckpt",        default_value="checkpoints/best"),
+        DeclareLaunchArgument("server_url",  default_value="http://localhost:8080"),
+        DeclareLaunchArgument("control_hz",  default_value="10.0"),
+        DeclareLaunchArgument("mode",        default_value="hybrid",
+                              description="manual | vla | hybrid"),
+        DeclareLaunchArgument("camera_backend", default_value="gstreamer",
+                              description="gstreamer | usb | dummy"),
+        # 선택 활성화 플래그
+        DeclareLaunchArgument("inference",   default_value="true"),
+        DeclareLaunchArgument("camera",      default_value="true"),
+        DeclareLaunchArgument("keyboard",    default_value="true"),
+    ]
 
-    # ── 추론 서버 프로세스 (Python subprocess) ──────────────────────
+    # ── 추론 서버 (GX10 또는 온보드) ────────────────────────────────
     inference_server = ExecuteProcess(
         cmd=[
             sys.executable,
             "inference/server.py",
+            "--config", LaunchConfiguration("config"),
             "--ckpt",   LaunchConfiguration("ckpt"),
             "--host",   "0.0.0.0",
             "--port",   "8080",
@@ -57,11 +60,26 @@ def generate_launch_description():
         ],
         output="screen",
         name="mona_pi_inference_server",
+        condition=IfCondition(LaunchConfiguration("inference")),
     )
 
-    # ── ROS2 컨트롤러 노드 ─────────────────────────────────────────
+    # ── 카메라 노드 ──────────────────────────────────────────────────
+    camera_node = ExecuteProcess(
+        cmd=[
+            sys.executable,
+            "robot/camera_node.py",
+            "--backend", LaunchConfiguration("camera_backend"),
+            "--fps", "30",
+            "--compressed",
+        ],
+        output="screen",
+        name="mona_pi_camera",
+        condition=IfCondition(LaunchConfiguration("camera")),
+    )
+
+    # ── ROS2 컨트롤러 노드 ──────────────────────────────────────────
     controller_node = Node(
-        package="mona_pi",       # ros2 패키지 이름 (setup.py에서 정의)
+        package="mona_pi",
         executable="ros2_controller",
         name="mona_pi_controller",
         output="screen",
@@ -74,20 +92,33 @@ def generate_launch_description():
         }],
     )
 
-    # ── 서버 종료 시 전체 종료 ────────────────────────────────────
+    # ── 키보드 컨트롤러 ─────────────────────────────────────────────
+    keyboard_node = ExecuteProcess(
+        cmd=[
+            sys.executable,
+            "robot/keyboard_controller.py",
+            "--mode", LaunchConfiguration("mode"),
+            "--throttle", "50",
+        ],
+        output="screen",
+        name="mona_pi_keyboard",
+        condition=IfCondition(LaunchConfiguration("keyboard")),
+    )
+
+    # ── 추론 서버 종료 시 알림 ───────────────────────────────────────
     on_server_exit = RegisterEventHandler(
         OnProcessExit(
             target_action=inference_server,
-            on_exit=[LogInfo(msg="추론 서버가 종료되었습니다.")],
+            on_exit=[LogInfo(msg="[MoNa-pi] 추론 서버가 종료되었습니다.")],
         )
     )
 
-    return LaunchDescription([
-        instruction_arg,
-        ckpt_arg,
-        server_url_arg,
-        control_hz_arg,
-        inference_server,
-        controller_node,
-        on_server_exit,
-    ])
+    return LaunchDescription(
+        args + [
+            inference_server,
+            camera_node,
+            controller_node,
+            keyboard_node,
+            on_server_exit,
+        ]
+    )
