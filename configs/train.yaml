@@ -15,8 +15,8 @@ model:
   lang_model_id: "google/gemma-2b"
 
 data:
-  # v5 데이터셋 경로 (실제 경로로 변경)
-  train_path: /home/minum/minum/26CS/MoNa-pi/mobile_vla_dataset_v5/
+  # 통합 데이터셋: v5(150ep) + add_free(221ep) = 244 고유 에피소드
+  train_path: /home/minum/26CS/MoNa-pi/mobile_vla_dataset_merged/
   val_split: 0.1         # 전체 중 10%를 검증용으로
   window_size: 8         # 이미지 이력 윈도우
   image_size: 224        # paligemma-3b-pt-224 입력 해상도
@@ -35,18 +35,17 @@ data:
   cf_steer_prob: 0.10        # 5% → 10%
 
 train:
-  batch_size: 4          # Jetson AGX 메모리 고려
-  lr: 5.0e-5             # 파인튜닝: 1e-4 → 5e-5 (best ckpt에서 재시작)
-  epochs: 20             # 파인튜닝: 20 에포크
+  batch_size: 4
+  lr: 1.0e-4             # 데이터 2배 → 처음부터 재학습
+  epochs: 30             # 244ep 기준, 과적합 방지 (기존 70→30)
   warmup_steps: 500
-  grad_clip: 1.0         # gradient clipping max norm
+  grad_clip: 1.0
   checkpoint_dir: checkpoints/
-  keep_top_k: 3          # best val_loss 기준 체크포인트 유지 수
+  keep_top_k: 3
   seed: 42
 
 pretrain:
-  # best checkpoint에서 파인튜닝 재시작 (증강 강화 버전)
-  ckpt_path: "checkpoints/epoch_048_loss_0.0404"
+  ckpt_path: ""          # 처음부터 재학습
 
 logging:
   use_wandb: false       # true: W&B, false: TensorBoard
