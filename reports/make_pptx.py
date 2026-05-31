@@ -1143,30 +1143,29 @@ def s08_results(prs, buf_cmp):
     """Slide 10 — 주요 결과: 폐루프 시뮬레이션"""
     sl = blank(prs)
     set_bg(sl)
-    hdr(sl, "주요 결과: 폐루프 시뮬레이션 (Val 30 ep)")
+    hdr(sl, "주요 결과: 폐루프 시뮬레이션 (CL Eval)")
 
     # ── 왼쪽 표 (RECT 방식) ──────────────────────────────────────────────────
     col_defs = [
         ("모델",          Inches(0.477), Inches(1.099)),
-        ("Loss",          Inches(1.575), Inches(0.977)),
+        ("Val Loss",      Inches(1.575), Inches(0.977)),
         ("FPE ↓",         Inches(2.553), Inches(0.856)),
-        ("Success@1.0 ↑", Inches(3.409), Inches(1.825)),
+        ("CL Success ↑",  Inches(3.409), Inches(1.825)),
     ]
-    row_h = Inches(0.498)
+    row_h = Inches(0.449)
     hdr_y = Inches(1.230)
 
     for htxt, hx, hw in col_defs:
         rect(sl, hx, hdr_y, hw, row_h, fill=C_BLUE)
         mono(sl, htxt, hx + Inches(0.04), hdr_y + Inches(0.04),
              hw - Inches(0.08), row_h - Inches(0.08),
-             sz=12, bold=True, clr=C_WHITE, align=CENTER)
+             sz=11, bold=True, clr=C_WHITE, align=CENTER)
 
     # Data rows
     data_rows = [
-        (["Random", "—",      "13.490", "—"     ], None),
-        (["v2 best", "0.0619", "0.857", "~79%"  ], None),
-        (["v3",      "0.0682", "0.740", "76.7%" ], None),
-        (["v3-A ★",  "0.0714", "0.731", "86.7%" ], 'orange'),
+        (["Random",       "—",      "13.490", "—"     ], None),
+        (["v3-A (MoNaVLA)","0.0714", "0.731", "86.7%" ], None),
+        (["MoNa-pi v4 ★", "0.0404", "0.049", "100%"  ], 'green'),
     ]
     col_xs = [Inches(0.477), Inches(1.575), Inches(2.553), Inches(3.409)]
     col_ws = [Inches(1.099), Inches(0.977), Inches(0.856), Inches(1.825)]
@@ -1176,17 +1175,23 @@ def s08_results(prs, buf_cmp):
         ry = hdr_y + row_h * (i + 1)
         rh = row_h
 
-        if hl == 'orange':
+        if hl == 'green':
+            rect(sl, Inches(0.469), ry, Inches(4.765), rh, fill=C_GREEN)
+            for txt, cx, cw in zip(cells, col_xs, col_ws):
+                mono(sl, txt, cx + Inches(0.04), ry + Inches(0.04),
+                     cw - Inches(0.08), rh - Inches(0.08),
+                     sz=11, bold=True, clr=C_WHITE, align=CENTER)
+        elif hl == 'orange':
             rect(sl, Inches(0.469), ry, Inches(4.765), rh, fill=C_ORANGE)
             for txt, cx, cw in zip(cells, col_xs, col_ws):
                 mono(sl, txt, cx + Inches(0.04), ry + Inches(0.04),
                      cw - Inches(0.08), rh - Inches(0.08),
-                     sz=12, bold=True, clr=C_WHITE, align=CENTER)
+                     sz=11, bold=True, clr=C_WHITE, align=CENTER)
         else:
             for txt, cx, cw in zip(cells, col_xs, col_ws):
                 mono(sl, txt, cx + Inches(0.04), ry + Inches(0.04),
                      cw - Inches(0.08), rh - Inches(0.08),
-                     sz=12, bold=False, clr=C_DARK, align=CENTER)
+                     sz=11, bold=False, clr=C_DARK, align=CENTER)
 
     # Comparison chart
     sl.shapes.add_picture(buf_cmp, Inches(0.469), Inches(3.280), Inches(4.765), Inches(2.125))
@@ -1195,18 +1200,21 @@ def s08_results(prs, buf_cmp):
     card(sl, Inches(5.554), Inches(1.230), Inches(3.977), Inches(1.289),
          border_clr=C_BORDER, border_w=1.4, fill=C_WHITE, left_accent=C_GREEN)
 
-    sans(sl, "🚀 v3-A 성능 도약",
+    sans(sl, "🚀 MoNa-pi v4 (π0 AdaLN-Zero)",
          Inches(5.648), Inches(1.270), Inches(3.789), Inches(0.340),
-         sz=14, bold=True, clr=C_GREEN)
+         sz=13, bold=True, clr=C_GREEN)
 
     box, tf = _tb_raw(sl, Inches(5.648), Inches(1.610), Inches(3.789), Inches(0.820))
     mixed_para(tf, [
-        ("Instruction 다양화 적용 후\n", False, C_DARK, FS),
+        ("Flow Matching + AdaLN-Zero\n", False, C_DARK, FS),
     ], sz=12, first=True)
     mixed_para(tf, [
-        ("Success +10%p 향상", True, C_DARK, FS),
-        (" (86.7%)",           False, C_DARK, FS),
+        ("CL FPE 0.049m  ", True, C_GREEN, FS),
+        ("Success 100%", True, C_GREEN, FS),
     ], sz=12)
+    mixed_para(tf, [
+        ("val 24 ep, FPE<0.5m & TLD∈[0.7,1.5]", False, C_MUTED, FS),
+    ], sz=9)
 
     # ── 오른쪽 하단 카드 ─────────────────────────────────────────────────────
     card(sl, Inches(5.554), Inches(2.675), Inches(3.977), Inches(2.076),
