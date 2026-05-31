@@ -20,7 +20,7 @@ cd "$SCRIPT_DIR"
 CONFIG="${CONFIG:-configs/serbot2.yaml}"
 CKPT="${CKPT:-checkpoints/best}"
 SERVER_URL="${SERVER_URL:-http://localhost:8080}"
-INSTRUCTION="${INSTRUCTION:-Navigate to the goal}"
+INSTRUCTION="${INSTRUCTION:-[FORWARD] 목표물을 향해 이동해}"
 MODE="${1:-hybrid}"
 
 # ROS2 환경

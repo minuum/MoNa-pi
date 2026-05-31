@@ -109,7 +109,9 @@ python robot/camera_node.py --backend gstreamer --fps 30
 # 3. 컨트롤러
 python robot/ros2_controller.py \
     --server-url http://localhost:8080 \
-    --instruction "Navigate to the goal"
+    --instruction "[FORWARD] 목표물을 향해 이동해"
+# ⚠️ 반드시 [INTENT] 태그 포함 — 없으면 성능 급락
+# [FORWARD]/[STRAFE_LEFT]/[STRAFE_RIGHT]/[TURN_LEFT]/[TURN_RIGHT]/[FORWARD_LEFT]/[FORWARD_RIGHT]
 
 # 4. 키보드 (모드 전환)
 python robot/keyboard_controller.py --mode hybrid

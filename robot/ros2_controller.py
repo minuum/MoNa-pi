@@ -198,7 +198,7 @@ if ROS2_AVAILABLE:
 
             # 파라미터 선언
             self.declare_parameter("inference_server_url", "http://localhost:8080")
-            self.declare_parameter("instruction", "Navigate to the goal")
+            self.declare_parameter("instruction", "[FORWARD] 목표물을 향해 이동해")
             self.declare_parameter("control_hz", 10.0)
             self.declare_parameter("max_linear_vel", 1.15)
             self.declare_parameter("max_angular_vel", 1.15)
@@ -308,7 +308,7 @@ if ROS2_AVAILABLE:
 
 def main():
     parser = argparse.ArgumentParser(description="MoNa-pi ROS2 컨트롤러")
-    parser.add_argument("--instruction", default="Navigate to the goal")
+    parser.add_argument("--instruction", default="[FORWARD] 목표물을 향해 이동해")
     parser.add_argument("--server-url",  default="http://localhost:8080")
     parser.add_argument("--control-hz",  type=float, default=10.0)
     args, ros_args = parser.parse_known_args()

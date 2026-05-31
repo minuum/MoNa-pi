@@ -187,7 +187,7 @@ class IntentPrefixInjector:
 
     MOVE_THRESH = 0.15
     ROT_THRESH  = 0.15
-    NOISE_PROB  = 0.2  # MoNaVLA 동일
+    NOISE_PROB  = 0.05  # 20%→5%: generic instruction 실패 원인 제거
 
     def classify_chunk(self, actions: np.ndarray) -> str:
         mean = np.mean(actions, axis=0)
