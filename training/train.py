@@ -43,11 +43,24 @@ def load_config(path: str) -> dict:
 # ─────────────────────────────────────────────
 
 def load_pretrained_weights(model: nn.Module, ckpt_path: str) -> nn.Module:
-    if not ckpt_path or not os.path.exists(ckpt_path):
+    from pathlib import Path as _Path
+    p = _Path(ckpt_path) if ckpt_path else _Path("")
+    # 디렉토리 형식 (Accelerate safetensors)
+    sf = p / "model.safetensors" if p.is_dir() else (p if p.suffix == ".safetensors" else None)
+    pt = p / "pytorch_model.bin" if p.is_dir() else (p if p.suffix == ".bin" else None)
+
+    if sf and sf.exists():
+        from safetensors.torch import load_file
+        checkpoint = load_file(str(sf), device="cpu")
+    elif pt and pt.exists():
+        checkpoint = torch.load(str(pt), map_location="cpu", weights_only=True)
+    elif p.exists() and p.is_file():
+        checkpoint = torch.load(str(p), map_location="cpu", weights_only=False)
+    else:
         print(f"[Train] 체크포인트 없음 ({ckpt_path}), 처음부터 학습")
         return model
+
     print(f"[Train] 가중치 로드: {ckpt_path}")
-    checkpoint = torch.load(ckpt_path, map_location="cpu")
     model_dict = model.state_dict()
     matched = {k: v for k, v in checkpoint.items()
                if k in model_dict and v.shape == model_dict[k].shape}

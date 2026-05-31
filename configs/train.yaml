@@ -29,15 +29,15 @@ data:
   # MoNaVLA 계승: 증강 & Counterfactual
   augment: true              # HFlip 50% + angular_z 반전 + instruction 교체
   use_color_jitter: true     # ColorJitter (brightness/contrast/saturation/hue)
-  use_random_crop: false     # RandomResizedCrop (384 해상도에서는 성능 이득 미미)
+  use_random_crop: true      # RandomResizedCrop — 데이터 적을때 일반화 효과 (MoNaVLA exp60)
   use_counterfactual: true   # Counterfactual stop/steer 주입
-  cf_stop_prob: 0.05         # 5% 확률로 정지 명령 오버라이드
-  cf_steer_prob: 0.05        # 5% 확률로 회전 명령 오버라이드
+  cf_stop_prob: 0.10         # 5% → 10%: 데이터 적을수록 강하게 (MoNaVLA exp60 교훈)
+  cf_steer_prob: 0.10        # 5% → 10%
 
 train:
   batch_size: 4          # Jetson AGX 메모리 고려
-  lr: 1.0e-4
-  epochs: 50
+  lr: 5.0e-5             # 파인튜닝: 1e-4 → 5e-5 (best ckpt에서 재시작)
+  epochs: 20             # 파인튜닝: 20 에포크
   warmup_steps: 500
   grad_clip: 1.0         # gradient clipping max norm
   checkpoint_dir: checkpoints/
@@ -45,8 +45,8 @@ train:
   seed: 42
 
 pretrain:
-  # 기존 MoNaVLA 체크포인트 경로 (없으면 빈 문자열)
-  ckpt_path: ""
+  # best checkpoint에서 파인튜닝 재시작 (증강 강화 버전)
+  ckpt_path: "checkpoints/epoch_048_loss_0.0404"
 
 logging:
   use_wandb: false       # true: W&B, false: TensorBoard
