@@ -1165,7 +1165,7 @@ def s08_results(prs, buf_cmp):
     data_rows = [
         (["Random",       "—",      "13.490", "—"     ], None),
         (["v3-A (MoNaVLA)","0.0714", "0.731", "86.7%" ], None),
-        (["MoNa-pi v4 ★", "0.0404", "0.049", "100%"  ], 'green'),
+        (["MoNa-pi v4 ★", "0.0414", "0.048", "100%"  ], 'green'),
     ]
     col_xs = [Inches(0.477), Inches(1.575), Inches(2.553), Inches(3.409)]
     col_ws = [Inches(1.099), Inches(0.977), Inches(0.856), Inches(1.825)]
@@ -1209,7 +1209,7 @@ def s08_results(prs, buf_cmp):
         ("Flow Matching + AdaLN-Zero\n", False, C_DARK, FS),
     ], sz=12, first=True)
     mixed_para(tf, [
-        ("CL FPE 0.049m  ", True, C_GREEN, FS),
+        ("CL FPE 0.048m  ", True, C_GREEN, FS),
         ("Success 100%", True, C_GREEN, FS),
     ], sz=12)
     mixed_para(tf, [
