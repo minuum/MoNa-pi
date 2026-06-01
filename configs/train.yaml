@@ -45,7 +45,8 @@ train:
   seed: 42
 
 pretrain:
-  ckpt_path: ""          # 처음부터 재학습
+  # lerobot/pi0_old에서 추출한 로봇 데이터 적응 backbone
+  ckpt_path: "checkpoints/lerobot_pi0_backbone"
 
 logging:
   use_wandb: false       # true: W&B, false: TensorBoard
