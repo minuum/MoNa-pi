@@ -1,0 +1,57 @@
+# MoNa-pi LoRA 학습 설정
+# PaliGemma language_model에 LoRA 적용 (MoNaVLA Exp59 방식)
+# python training/train.py --config configs/train_lora.yaml
+
+model:
+  action_dim: 3
+  horizon: 10
+  hidden_dim: 512
+  n_flow_steps: 50
+
+  use_paligemma: true
+  load_pretrained_paligemma: true
+  paligemma_id: "google/paligemma-3b-pt-224"
+  vision_model_id: "google/siglip-so400m-patch14-384"
+  lang_model_id: "google/gemma-2b"
+
+  # LoRA: Gemma-2B language model q/v/k/o_proj에 adapter 추가 (~20M 파라미터)
+  use_lora: true
+  lora_r: 16              # rank (16=표준, 32=고품질)
+  use_gemma_expert: false
+  use_int8: false
+
+data:
+  train_path: /home/minum/26CS/MoNa-pi/mobile_vla_dataset_merged/
+  val_split: 0.1
+  window_size: 8
+  image_size: 224
+  preprocess: true
+  smooth: true
+  normalize: false
+  inject_prefix: true
+  use_delta: false
+  augment: true
+  use_color_jitter: true
+  use_random_crop: true
+  use_counterfactual: true
+  cf_stop_prob: 0.10
+  cf_steer_prob: 0.10
+
+train:
+  batch_size: 2           # LoRA 메모리 추가로 배치 줄임
+  lr: 2.0e-5              # LoRA는 낮은 LR 권장 (backbone 오염 방지)
+  epochs: 20
+  warmup_steps: 300
+  grad_clip: 1.0
+  checkpoint_dir: checkpoints/lora/
+  keep_top_k: 3
+  seed: 42
+
+pretrain:
+  ckpt_path: ""
+
+logging:
+  use_wandb: false
+  project: mona-pi
+  entity: shosae
+  log_every_n_steps: 20

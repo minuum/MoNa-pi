@@ -233,6 +233,8 @@ def train(config_path: str):
         use_paligemma=cfg["model"].get("use_paligemma", True),
         load_pretrained_paligemma=cfg["model"].get("load_pretrained_paligemma", False),
         use_int8=cfg["model"].get("use_int8", False),
+        use_lora=cfg["model"].get("use_lora", False),
+        lora_r=cfg["model"].get("lora_r", 16),
         use_gemma_expert=cfg["model"].get("use_gemma_expert", False),
         load_lerobot=cfg["model"].get("load_lerobot", False),
         vision_model_id=cfg["model"].get("vision_model_id", "google/siglip-so400m-patch14-384"),

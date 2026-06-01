@@ -24,6 +24,8 @@ class Pi0VLA(nn.Module):
         use_paligemma: bool = True,
         load_pretrained_paligemma: bool = False,
         use_int8: bool = False,
+        use_lora: bool = False,
+        lora_r: int = 16,
         use_gemma_expert: bool = False,
         load_lerobot: bool = False,
         vision_model_id: str = "google/siglip-so400m-patch14-384",
@@ -43,6 +45,8 @@ class Pi0VLA(nn.Module):
                 gemma_id=lang_model_id,
                 load_pretrained_paligemma=load_pretrained_paligemma,
                 use_int8=use_int8,
+                use_lora=use_lora,
+                lora_r=lora_r,
                 max_text_len=kwargs.get("max_text_len", 48),
             )
         else:
@@ -67,9 +71,12 @@ class Pi0VLA(nn.Module):
         )
 
 
-        # INT8 모델은 bfloat16() 재캐스팅 금지
-        if not use_int8:
+        # INT8/LoRA 모델은 bfloat16() 재캐스팅 금지
+        if not use_int8 and not use_lora:
             self.bfloat16()
+        elif use_lora and not use_int8:
+            # LoRA: backbone은 LoRA가 이미 bfloat16, action_expert만 캐스팅
+            self.action_expert.bfloat16()
 
     # ─────────────────────────────────────────────────────────────────
     def forward_backbone(self, images: torch.Tensor, instructions) -> torch.Tensor:

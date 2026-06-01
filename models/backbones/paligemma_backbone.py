@@ -35,6 +35,9 @@ class PaliGemmaBackbone(nn.Module):
         gemma_id: str = "google/gemma-2b",
         load_pretrained_paligemma: bool = False,
         use_int8: bool = False,
+        use_lora: bool = False,
+        lora_r: int = 16,
+        lora_target_modules: list = None,
         max_text_len: int = 48,
         **kwargs,
     ):
@@ -107,6 +110,21 @@ class PaliGemmaBackbone(nn.Module):
         # INT8 모델은 bfloat16() 재캐스팅 금지 (이미 양자화됨)
         if not use_int8:
             self.bfloat16()
+
+        # LoRA: Gemma language_model 언어 모델 부분에 적용 (MoNaVLA Exp59 방식)
+        if use_lora and not use_int8:
+            from peft import LoraConfig, get_peft_model, TaskType
+            targets = lora_target_modules or ["q_proj", "v_proj", "k_proj", "o_proj"]
+            lora_cfg = LoraConfig(
+                r=lora_r,
+                lora_alpha=lora_r * 2,
+                target_modules=targets,
+                lora_dropout=0.05,
+                bias="none",
+            )
+            self.language_model = get_peft_model(self.language_model, lora_cfg)
+            trainable = sum(p.numel() for p in self.language_model.parameters() if p.requires_grad)
+            print(f"[LoRA] language_model LoRA 적용: rank={lora_r}, 학습 파라미터 +{trainable/1e6:.1f}M")
 
     # ─────────────────────────────────────────────────────────────────
     def forward(self, images: torch.Tensor, text_input=None) -> torch.Tensor:
