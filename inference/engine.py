@@ -30,8 +30,31 @@ from PIL import Image as PILImage
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from models.pi0_core import Pi0VLA
-from data.preprocessing import ActionNormalizer
 from inference.ode_solver import build_solver
+
+
+class ActionNormalizer:
+    """3-DOF 옴니휠 로봇 액션 정규화 (lx, ly, az). 범위: [-1.15, 1.15]"""
+
+    def __init__(self, min_val: float = -1.15, max_val: float = 1.15, action_dim: int = 3):
+        self.min_vals = np.full(action_dim, min_val, dtype=np.float32)
+        self.max_vals = np.full(action_dim, max_val, dtype=np.float32)
+
+    def normalize(self, actions: np.ndarray) -> np.ndarray:
+        return 2.0 * (actions - self.min_vals) / (self.max_vals - self.min_vals + 1e-8) - 1.0
+
+    def unnormalize(self, actions_norm: np.ndarray) -> np.ndarray:
+        return 0.5 * (actions_norm + 1.0) * (self.max_vals - self.min_vals) + self.min_vals
+
+    def normalize_tensor(self, actions: torch.Tensor) -> torch.Tensor:
+        min_t = torch.from_numpy(self.min_vals).to(actions.device)
+        max_t = torch.from_numpy(self.max_vals).to(actions.device)
+        return 2.0 * (actions - min_t) / (max_t - min_t + 1e-8) - 1.0
+
+    def unnormalize_tensor(self, actions: torch.Tensor) -> torch.Tensor:
+        min_t = torch.from_numpy(self.min_vals).to(actions.device)
+        max_t = torch.from_numpy(self.max_vals).to(actions.device)
+        return 0.5 * (actions + 1.0) * (max_t - min_t) + min_t
 
 
 class MoNaPiEngine:

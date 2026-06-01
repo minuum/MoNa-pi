@@ -61,9 +61,11 @@ class PaliGemmaBackbone(nn.Module):
             else:
                 kwargs_pg["torch_dtype"] = torch.bfloat16
             pg = PaliGemmaForConditionalGeneration.from_pretrained(paligemma_id, **kwargs_pg)
-            self.vision_tower   = pg.model.vision_tower
-            self.projector      = pg.model.multi_modal_projector
-            self.language_model = pg.model.language_model
+            self.vision_tower   = pg.vision_tower
+            self.projector      = pg.multi_modal_projector
+            # pg.language_model 은 GemmaForCausalLM — 내부 GemmaModel 을 뽑아야 embed_tokens 접근 가능
+            lm = pg.language_model
+            self.language_model = lm.model if hasattr(lm, "model") else lm
             self.tokenizer = AutoTokenizer.from_pretrained(paligemma_id, token=token)
             del pg; gc.collect()
 
