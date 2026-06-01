@@ -1,0 +1,55 @@
+# MoNa-pi Gemma Action Expert 학습 설정
+# π0 정통: VLM 토큰 + action 토큰 통합 Gemma self-attention
+# python training/train.py --config configs/train_gemma_expert.yaml
+
+model:
+  action_dim: 3
+  horizon: 10
+  hidden_dim: 512        # FlowMatchingHead 미사용 (Gemma=1024 내부)
+  n_flow_steps: 50
+
+  use_paligemma: true
+  load_pretrained_paligemma: true
+  paligemma_id: "google/paligemma-3b-pt-224"
+  vision_model_id: "google/siglip-so400m-patch14-384"
+  lang_model_id: "google/gemma-2b"
+
+  # π0 정통 Gemma Action Expert
+  use_gemma_expert: true
+  load_lerobot: true     # lerobot/pi0_old gemma_expert 처음 4레이어로 초기화
+
+data:
+  train_path: /home/minum/26CS/MoNa-pi/mobile_vla_dataset_merged/
+  val_split: 0.1
+  window_size: 8
+  image_size: 224
+  preprocess: true
+  smooth: true
+  normalize: false
+  inject_prefix: true
+  use_delta: false
+  augment: true
+  use_color_jitter: true
+  use_random_crop: true
+  use_counterfactual: true
+  cf_stop_prob: 0.10
+  cf_steer_prob: 0.10
+
+train:
+  batch_size: 2          # Gemma expert 커서 배치 줄임
+  lr: 5.0e-5             # 사전학습 가중치 활용, 낮은 LR
+  epochs: 20
+  warmup_steps: 300
+  grad_clip: 1.0
+  checkpoint_dir: checkpoints/gemma_expert/
+  keep_top_k: 3
+  seed: 42
+
+pretrain:
+  ckpt_path: "checkpoints/lerobot_pi0_backbone"
+
+logging:
+  use_wandb: false
+  project: mona-pi
+  entity: shosae
+  log_every_n_steps: 20

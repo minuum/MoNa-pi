@@ -2,12 +2,18 @@ import torch
 import torch.nn as nn
 from .flow_head import FlowMatchingHead
 
+
 class MoNaActionExpert(nn.Module):
     """
-    MoNa-pi Project Main Action Expert
-    
-    π0 정통 아키텍처를 계승하며 MoNa-pi v5 데이터셋 특성에 최적화된 버전.
-    연구용 베이스라인(ActionExpert)과 분리하여 실제 주행 학습에 사용함.
+    MoNa-pi Action Expert.
+
+    use_gemma_expert=False (기본):
+        FlowMatchingHead (커스텀 Transformer, hidden=512, 4-layer, AdaLN-Zero)
+
+    use_gemma_expert=True (π0 정통):
+        GemmaActionExpert (Gemma transformer, hidden=1024, n_layers)
+        VLM 토큰 + action 토큰 통합 self-attention
+        lerobot/pi0_old 로봇 적응 가중치로 초기화 가능
     """
 
     def __init__(
@@ -18,24 +24,35 @@ class MoNaActionExpert(nn.Module):
         cond_dim: int = 2048,
         n_layers: int = 4,
         n_heads: int = 8,
+        use_gemma_expert: bool = False,
+        load_lerobot: bool = False,
     ):
         super().__init__()
         self.action_dim = action_dim
         self.horizon = horizon
-        
-        # MoNa-pi v5 데이터셋(1.150)을 위한 기본 정규화 파라미터 
-        # (π0 정통에서도 수치 안정성을 위해 필수적인 처리)
-        self.register_buffer("mean", torch.zeros(action_dim))
-        self.register_buffer("std", torch.ones(action_dim) * 1.2) # v5 vx, vy max가 대략 1.15
 
-        self._head = FlowMatchingHead(
-            input_dim=cond_dim,
-            action_dim=action_dim,
-            horizon=horizon,
-            hidden_dim=hidden_dim,
-            n_layers=n_layers,
-            n_heads=n_heads,
-        )
+        self.register_buffer("mean", torch.zeros(action_dim))
+        self.register_buffer("std",  torch.ones(action_dim) * 1.2)
+
+        if use_gemma_expert:
+            from .gemma_action_expert import GemmaActionExpert
+            self._head = GemmaActionExpert(
+                action_dim=action_dim,
+                horizon=horizon,
+                cond_dim=cond_dim,
+                hidden_size=1024,
+                n_layers=n_layers,
+                load_lerobot=load_lerobot,
+            )
+        else:
+            self._head = FlowMatchingHead(
+                input_dim=cond_dim,
+                action_dim=action_dim,
+                horizon=horizon,
+                hidden_dim=hidden_dim,
+                n_layers=n_layers,
+                n_heads=n_heads,
+            )
 
     def normalize(self, actions: torch.Tensor) -> torch.Tensor:
         """Raw 물리값(1.150 등) -> 정규화 공간(~1.0) 변환"""

@@ -232,8 +232,12 @@ def train(config_path: str):
         hidden_dim=cfg["model"]["hidden_dim"],
         use_paligemma=cfg["model"].get("use_paligemma", True),
         load_pretrained_paligemma=cfg["model"].get("load_pretrained_paligemma", False),
+        use_int8=cfg["model"].get("use_int8", False),
+        use_gemma_expert=cfg["model"].get("use_gemma_expert", False),
+        load_lerobot=cfg["model"].get("load_lerobot", False),
         vision_model_id=cfg["model"].get("vision_model_id", "google/siglip-so400m-patch14-384"),
         lang_model_id=cfg["model"].get("lang_model_id", "google/gemma-2b"),
+        paligemma_id=cfg["model"].get("paligemma_id", "google/paligemma-3b-pt-224"),
     )
     model = load_pretrained_weights(model, cfg["pretrain"].get("ckpt_path", ""))
 

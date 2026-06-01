@@ -9,10 +9,13 @@ model:
 
   # PaliGemma 백본 설정 (π0 논문 방식)
   use_paligemma: true
-  load_pretrained_paligemma: true   # 로컬 캐시: paligemma-3b-pt-224 사용
+  load_pretrained_paligemma: true
   paligemma_id: "google/paligemma-3b-pt-224"
   vision_model_id: "google/siglip-so400m-patch14-384"
   lang_model_id: "google/gemma-2b"
+  # π0 정통 Gemma Action Expert (false=커스텀 FlowMatchingHead, true=Gemma 1024-dim)
+  use_gemma_expert: false
+  load_lerobot: false              # true: lerobot/pi0_old gemma_expert 가중치 사용
 
 data:
   # 통합 데이터셋: v5(150ep) + add_free(221ep) = 244 고유 에피소드

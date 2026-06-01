@@ -66,9 +66,29 @@ with safe_open(ckpt_path, framework="pt", device="cpu") as f:
 print(f"  매핑됨: {len(remapped)}개")
 print(f"  건너뜀: {len(skipped)}개 ({', '.join(skipped[:3])}...)")
 
-print("[3/3] 저장 중...")
+print("[3/4] backbone 저장 중...")
 out_dir = Path("checkpoints/lerobot_pi0_backbone")
 out_dir.mkdir(parents=True, exist_ok=True)
 save_file(remapped, str(out_dir / "model.safetensors"))
 print(f"  저장 완료: {out_dir}/model.safetensors")
 print(f"  총 {len(remapped)}개 레이어 (vision_tower + projector + language_model)")
+
+# ── gemma_expert 별도 추출 ───────────────────────────────────────────────
+print("[4/4] gemma_expert 가중치 추출...")
+EXPERT_PREFIX = "model.paligemma_with_expert.gemma_expert."
+expert = {}
+with safe_open(ckpt_path, framework="pt", device="cpu") as f:
+    for key in f.keys():
+        if key.startswith(EXPERT_PREFIX):
+            sub = key[len(EXPERT_PREFIX):]   # e.g. "model.layers.0.*" or "lm_head.*"
+            # GemmaModel state dict: .model. 레벨 제거
+            if sub.startswith("model."):
+                sub = sub[len("model."):]    # "layers.0.*"
+            new_key = "gemma." + sub
+            expert[new_key] = f.get_tensor(key)
+
+expert_dir = Path("checkpoints/lerobot_gemma_expert")
+expert_dir.mkdir(parents=True, exist_ok=True)
+save_file(expert, str(expert_dir / "model.safetensors"))
+print(f"  저장 완료: {expert_dir}/model.safetensors")
+print(f"  총 {len(expert)}개 레이어 (18-layer Gemma expert, hidden=1024)")

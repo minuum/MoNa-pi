@@ -24,6 +24,8 @@ class Pi0VLA(nn.Module):
         use_paligemma: bool = True,
         load_pretrained_paligemma: bool = False,
         use_int8: bool = False,
+        use_gemma_expert: bool = False,
+        load_lerobot: bool = False,
         vision_model_id: str = "google/siglip-so400m-patch14-384",
         lang_model_id: str = "google/gemma-2b",
         paligemma_id: str = "google/paligemma-3b-pt-224",
@@ -60,6 +62,8 @@ class Pi0VLA(nn.Module):
             horizon=horizon,
             hidden_dim=hidden_dim,
             cond_dim=cond_dim,
+            use_gemma_expert=use_gemma_expert,
+            load_lerobot=load_lerobot,
         )
 
 
