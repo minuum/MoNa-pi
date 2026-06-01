@@ -33,7 +33,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from models.pi0_core import Pi0VLA
 from data.dataset import ActionChunkDataset, build_train_val_split
+from data.preprocessing import IntentPrefixInjector
 from safetensors.torch import load_file
+
+# 평가 시 사용할 intent injector (is_training=False → 노이즈 없음)
+_INJECTOR = IntentPrefixInjector()
 
 
 # ── 운동학 (MoNaVLA rollout_core 직접 이관, continuous) ─────────────────────
@@ -148,7 +152,7 @@ def eval_episode(
     """
     images_np   = ep_data["images"]   # (T, H, W, 3) uint8
     gt_actions  = ep_data["actions"]  # (T, 3) float32 raw
-    instruction = ep_data["instruction"]
+    raw_instr   = ep_data["instruction"]  # HDF5 raw (no [INTENT] tag)
 
     cfg_data  = cfg["data"]
     cfg_model = cfg["model"]
@@ -171,8 +175,13 @@ def eval_episode(
             frames.append(torch.from_numpy(arr))
         img_tensor = torch.stack(frames).unsqueeze(0).to(device)  # (1, N, C, H, W)
 
+        # 현재 GT 액션 청크로 intent 태그 주입 (학습 시와 동일 형식)
+        t_end   = min(t + horizon, len(gt_actions))
+        chunk_gt = gt_actions[t: t_end]
+        tagged_instr = _INJECTOR.inject(raw_instr, chunk_gt, is_training=False)
+
         # 모델 추론: sample_actions → (1, horizon, 3) raw physical
-        chunk = model.sample_actions(img_tensor, [instruction], n_steps=5)  # (1,h,3)
+        chunk = model.sample_actions(img_tensor, [tagged_instr], n_steps=5)  # (1,h,3)
         first_action = chunk[0, 0].float().cpu().numpy()  # (3,) [vx, vy, wz]
         pred_actions.append(first_action)
 
@@ -186,7 +195,7 @@ def eval_episode(
     pred_poses   = build_trajectory(pred_actions, dt)
 
     metrics = compute_metrics(expert_poses, pred_poses)
-    metrics["instruction"] = instruction
+    metrics["instruction"] = raw_instr
     return metrics
 
 
