@@ -1,0 +1,50 @@
+# M7 — 116 에피소드 (v5 원본, 데이터 크기 효과 측정)
+model:
+  action_dim: 3
+  horizon: 10
+  hidden_dim: 512
+  n_flow_steps: 50
+  use_paligemma: true
+  load_pretrained_paligemma: true
+  paligemma_id: "google/paligemma-3b-pt-224"
+  vision_model_id: "google/siglip-so400m-patch14-384"
+  lang_model_id: "google/gemma-2b"
+  use_gemma_expert: false
+  use_lora: false
+  use_int8: false
+
+data:
+  train_path: /home/minum/minum/26CS/MoNa-pi/mobile_vla_dataset_v5/  # ← 원본 116ep
+  val_split: 0.1
+  window_size: 8
+  image_size: 224
+  preprocess: true
+  smooth: true
+  normalize: false
+  inject_prefix: true
+  use_delta: false
+  augment: true
+  use_color_jitter: true
+  use_random_crop: true
+  use_counterfactual: true
+  cf_stop_prob: 0.10
+  cf_steer_prob: 0.10
+
+train:
+  batch_size: 4
+  lr: 1.0e-4
+  epochs: 30
+  warmup_steps: 500
+  grad_clip: 1.0
+  checkpoint_dir: checkpoints/ep116/
+  keep_top_k: 3
+  seed: 42
+
+pretrain:
+  ckpt_path: ""
+
+logging:
+  use_wandb: false
+  project: mona-pi
+  entity: shosae
+  log_every_n_steps: 20

@@ -38,6 +38,7 @@ from safetensors.torch import load_file
 
 # 평가 시 사용할 intent injector (is_training=False → 노이즈 없음)
 _INJECTOR = IntentPrefixInjector()
+_ODE_STEPS = 5  # main()에서 args.ode_steps로 덮어씀
 
 
 # ── 운동학 (MoNaVLA rollout_core 직접 이관, continuous) ─────────────────────
@@ -184,7 +185,7 @@ def eval_episode(
         tagged_instr = _INJECTOR.inject(raw_instr, chunk_gt, is_training=False)
 
         # 모델 추론: sample_actions → (1, horizon, 3) raw physical
-        chunk = model.sample_actions(img_tensor, [tagged_instr], n_steps=5)  # (1,h,3)
+        chunk = model.sample_actions(img_tensor, [tagged_instr], n_steps=_ODE_STEPS)  # (1,h,3)
         first_action = chunk[0, 0].float().cpu().numpy()  # (3,) [vx, vy, wz]
         pred_actions.append(first_action)
 
@@ -215,6 +216,7 @@ def main():
     parser.add_argument("--out",    default=None, help="결과 JSON 저장 경로")
     parser.add_argument("--regular-only", action="store_true",
                         help="정형 9종 경로만 평가 (center/left/right × straight/left/right)")
+    parser.add_argument("--ode-steps", type=int, default=5, help="ODE 솔버 스텝 수")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -259,8 +261,11 @@ def main():
     print(f"[CL Eval] {args.split} 에피소드 수: {len(val_f_idxs)}")
     print(f"[CL Eval] ckpt: {args.ckpt}, fpe_thresh: {args.fpe_thresh}m")
 
+    global _ODE_STEPS
+    _ODE_STEPS = args.ode_steps
+
     model = load_model(cfg, Path(args.ckpt), device)
-    print(f"[CL Eval] 모델 로드 완료 (device={device})")
+    print(f"[CL Eval] 모델 로드 완료 (device={device}, ode_steps={_ODE_STEPS})")
 
     results = []
     for f_idx in tqdm(val_f_idxs, desc="Episodes"):
