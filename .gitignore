@@ -37,6 +37,10 @@ checkpoints/
 *.safetensors
 .env
 
+# Dataset (HDF5)
+*.h5
+mobile_vla_dataset*/
+
 # Virtual environment
 .venv/
 

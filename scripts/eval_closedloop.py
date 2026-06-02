@@ -123,6 +123,9 @@ def load_model(cfg: dict, ckpt: Path, device: torch.device) -> Pi0VLA:
         paligemma_id=m.get("paligemma_id", "google/paligemma-3b-pt-224"),
         vision_model_id=m.get("vision_model_id", "google/siglip-so400m-patch14-384"),
         lang_model_id=m.get("lang_model_id", "google/gemma-2b"),
+        use_gemma_expert=m.get("use_gemma_expert", False),
+        use_lora=m.get("use_lora", False),
+        lora_r=m.get("lora_r", 16),
     )
     sf = ckpt / "model.safetensors"
     pt = ckpt / "pytorch_model.bin"
@@ -210,6 +213,8 @@ def main():
     parser.add_argument("--fpe-thresh", type=float, default=0.5)
     parser.add_argument("--dt",     type=float, default=0.1, help="제어 주기 (초)")
     parser.add_argument("--out",    default=None, help="결과 JSON 저장 경로")
+    parser.add_argument("--regular-only", action="store_true",
+                        help="정형 9종 경로만 평가 (center/left/right × straight/left/right)")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -234,6 +239,19 @@ def main():
     # val에 속하는 에피소드 f_idx 추출
     val_indices = val_ds.indices if hasattr(val_ds, "indices") else list(range(len(val_ds)))
     val_f_idxs  = sorted({base_ds.samples[i][0] for i in val_indices})
+
+    # 정형 경로 필터 (--regular-only)
+    REGULAR_PATHS = [
+        'center_straight', 'center_left', 'center_right',
+        'left_straight',   'left_left',   'left_right',
+        'right_straight',  'right_left',  'right_right',
+    ]
+    if args.regular_only:
+        h5_files = sorted(Path(cfg["data"]["train_path"]).glob("*.h5"))
+        idx_to_stem = {i: f.stem for i, f in enumerate(h5_files)}
+        val_f_idxs = [i for i in val_f_idxs
+                      if any(kw in idx_to_stem.get(i, '') for kw in REGULAR_PATHS)]
+        print(f"[CL Eval] --regular-only: 정형 9종만 ({len(val_f_idxs)}개)")
 
     if args.n_eps:
         val_f_idxs = val_f_idxs[:args.n_eps]
