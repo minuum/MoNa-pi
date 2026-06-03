@@ -119,6 +119,11 @@ class PredictResponse(BaseModel):
     instruction_used: bool = True
     # chunk 모드 전용
     chunk_index: int = 0
+    # 추가 호환성 필드
+    chunk: Optional[list[list[float]]] = None
+    speed_scale: Optional[float] = 1.0
+    grounding_cached: Optional[bool] = False
+    matched_path_type: Optional[str] = None
 
 
 class ConfigRequest(BaseModel):
@@ -323,7 +328,12 @@ def _build_response(actions: np.ndarray, latency_ms: float) -> PredictResponse:
                        "remaining": remaining, "chunk_idx": _chunk_idx},
         predicted_class=cls_idx,
         predicted_label=label,
+        goal_near_proxy=(label == "STOP"),
         chunk_index=_chunk_idx,
+        chunk=actions.tolist(),
+        speed_scale=1.0,
+        grounding_cached=False,
+        matched_path_type=None,
     )
 
 

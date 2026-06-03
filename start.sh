@@ -19,9 +19,12 @@ cd "$SCRIPT_DIR"
 
 CONFIG="${CONFIG:-configs/serbot2.yaml}"
 CKPT="${CKPT:-checkpoints/best}"
-SERVER_URL="${SERVER_URL:-http://localhost:8080}"
+SERVER_URL="${SERVER_URL:-http://localhost:8082}"
 INSTRUCTION="${INSTRUCTION:-Navigate to the goal}"
 MODE="${1:-hybrid}"
+
+# Extract port from SERVER_URL (defaults to 8082)
+PORT=$(echo "$SERVER_URL" | grep -oE '[0-9]+$' || echo "8082")
 
 # ROS2 환경
 ROS_SETUP="/opt/ros/humble/setup.bash"
@@ -48,7 +51,7 @@ case "$MODE" in
         --config "$CONFIG" \
         --ckpt   "$CKPT" \
         --host   0.0.0.0 \
-        --port   8080
+        --port   "$PORT"
     ;;
 
   manual)
@@ -81,15 +84,20 @@ case "$MODE" in
     ;;
 
   hybrid | *)
-    echo "[1/4] 추론 서버 시작..."
-    python inference/server.py \
-        --config "$CONFIG" \
-        --ckpt   "$CKPT" \
-        --host   0.0.0.0 --port 8080 &
-    SRV_PID=$!
+    if python3 -c "import socket; s = socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', $PORT))" 2>/dev/null; then
+        echo "[!] 포트 $PORT 에서 이미 추론 서버가 동작 중입니다. 기존 서버를 사용하며 대기를 건너뜁니다."
+        SRV_PID=""
+    else
+        echo "[1/4] 추론 서버 시작..."
+        python inference/server.py \
+            --config "$CONFIG" \
+            --ckpt   "$CKPT" \
+            --host   0.0.0.0 --port "$PORT" &
+        SRV_PID=$!
 
-    echo "  추론 서버 워밍업 대기 (30s)..."
-    sleep 30
+        echo "  추론 서버 워밍업 대기 (30s)..."
+        sleep 30
+    fi
 
     echo "[2/4] 카메라 노드 시작..."
     python robot/camera_node.py --backend gstreamer --fps 30 &

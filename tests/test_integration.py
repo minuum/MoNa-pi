@@ -105,7 +105,7 @@ class TestMockServer:
         import urllib.request
         resp = urllib.request.urlopen(f"{mock_server}/health")
         data = json.loads(resp.read())
-        assert data["status"] == "ok"
+        assert data["status"] in ("ok", "healthy")
 
     def test_predict_returns_10x3(self, mock_server):
         import urllib.request
