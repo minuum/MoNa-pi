@@ -133,6 +133,8 @@ class InferenceCaller:
         self.server_url = server_url.rstrip("/") + "/predict"
         self.timeout_s = timeout_ms / 1000.0
         self._session = requests.Session()
+        import os
+        self.api_key = os.getenv("MONAPI_API_KEY") or os.getenv("VLA_API_KEY")
 
     def call(
         self,
@@ -155,9 +157,14 @@ class InferenceCaller:
             pil.save(buf, format="JPEG", quality=85)
             b64 = base64.b64encode(buf.getvalue()).decode()
 
+            headers = {}
+            if self.api_key:
+                headers["X-API-Key"] = self.api_key
+
             resp = self._session.post(
                 self.server_url,
                 json={"image_b64": b64, "instruction": instruction},
+                headers=headers,
                 timeout=self.timeout_s,
             )
             resp.raise_for_status()

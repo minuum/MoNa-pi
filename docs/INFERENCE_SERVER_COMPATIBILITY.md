@@ -19,22 +19,24 @@ graph TD
 ## 2. MoNaVLA Gradio 대시보드 연결 방법
 
 1. **MoNa-pi 추론 서버 실행 (8082 포트)**
+   * MoNa-pi 서버는 `MONAPI_API_KEY`와 `VLA_API_KEY` 환경변수를 모두 자동으로 지원하므로, 시스템에 이미 `VLA_API_KEY`가 정의되어 있다면 추가 설정 없이 그대로 실행할 수 있습니다.
    ```bash
    python3 inference/server.py --config configs/serbot2.yaml --ckpt checkpoints/best --port 8082
    ```
 
 2. **MoNaVLA 대시보드 환경변수 설정 및 실행**
-   `MoNaVLA` 레포지토리 경로로 이동한 뒤, `VLA_API_SERVER` 환경변수를 설정하여 대시보드를 실행합니다:
+   `MoNaVLA` 레포지토리 경로로 이동한 뒤, `VLA_API_SERVER` 및 `VLA_API_KEY` 환경변수를 사용하여 대시보드를 실행합니다:
    ```bash
    cd /home/soda/MoNaVLA
    export VLA_API_SERVER=http://localhost:8082
+   export VLA_API_KEY="vla_devel_key_2026"
    python3 scripts/gradio_inference_dashboard.py
    ```
    * *참고: 대시보드 UI가 이미 브라우저에 켜져 있는 상태라면 브라우저 페이지를 **새로고침(F5)**하여 연동할 수 있습니다.*
 
 3. **대시보드 UI 설정**
    - **Backend Mode / 실험 모드**: `API Server` 선택
-   - **서버 Config 상태**: 포트 8082 서버 정보가 정상적으로 로드되는지 확인
+   - **서버 Config 상태**: 포트 8082 서버 정보가 정상적으로 로드되는지 확인 (API Key 인증이 자동 일치 처리됩니다)
 
 ---
 

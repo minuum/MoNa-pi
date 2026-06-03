@@ -66,7 +66,7 @@ def classify_action(vx: float, vy: float, wz: float) -> tuple[int, str]:
 # 인증 (선택적)
 # ─────────────────────────────────────────────
 
-_api_key: str | None = os.getenv("MONAPI_API_KEY")
+_api_key: str | None = os.getenv("MONAPI_API_KEY") or os.getenv("VLA_API_KEY")
 
 
 async def _verify_key(x_api_key: Optional[str] = Header(default=None)):
