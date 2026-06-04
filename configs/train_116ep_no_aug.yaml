@@ -1,0 +1,51 @@
+# MoNa-pi 116ep + No-Aug 학습 설정 (M12)
+model:
+  action_dim: 3
+  horizon: 10
+  hidden_dim: 512
+  n_flow_steps: 50
+  use_paligemma: true
+  load_pretrained_paligemma: true
+  paligemma_id: "google/paligemma-3b-pt-224"
+  vision_model_id: "google/siglip-so400m-patch14-384"
+  lang_model_id: "google/gemma-2b"
+  use_gemma_expert: false
+  use_lora: false
+  use_int8: false
+
+data:
+  # 116ep 데이터셋 경로
+  train_path: /home/minum/minum/26CS/MoNa-pi/mobile_vla_dataset_v5/
+  val_split: 0.1
+  window_size: 8
+  image_size: 224
+  preprocess: true
+  smooth: true
+  normalize: false
+  inject_prefix: true
+  use_delta: false
+  augment: false          # 증강 전체 OFF
+  use_color_jitter: false
+  use_random_crop: false
+  use_counterfactual: false
+  cf_stop_prob: 0.0
+  cf_steer_prob: 0.0
+
+train:
+  batch_size: 4
+  lr: 1.0e-4
+  epochs: 30
+  warmup_steps: 500
+  grad_clip: 1.0
+  checkpoint_dir: checkpoints/ep116_no_aug/
+  keep_top_k: 3
+  seed: 42
+
+pretrain:
+  ckpt_path: ""
+
+logging:
+  use_wandb: false
+  project: mona-pi
+  entity: shosae
+  log_every_n_steps: 20

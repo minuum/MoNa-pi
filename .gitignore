@@ -54,3 +54,7 @@ reports/attention_backbone_v2.json/
 
 # HuggingFace cache
 .cache/
+
+# Datasets & large binaries
+*.h5
+mobile_vla_dataset_merged/
