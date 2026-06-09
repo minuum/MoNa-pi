@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>MoNa-pi 판넬 스트립 (16:3)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── 캡쳐용 고정 크기: 3200 × 600 = 16:3 ── */
+  body {
+    background: #888;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'NanumGothic', sans-serif;
+  }
+
+  .strip {
+    width: 3200px;
+    height: 600px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.4);
+  }
+
+  /* ── 상단 헤더 바 ── */
+  .strip-header {
+    background: #1a3557;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 24px;
+    flex-shrink: 0;
+    height: 52px;
+  }
+  .sh-left  { font-size: 11px; opacity: 0.75; }
+  .sh-title { text-align: center; flex: 1; }
+  .sh-title .t1 { font-size: 17px; font-weight: 900; letter-spacing: -0.3px; }
+  .sh-title .t2 { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+  .sh-right { font-size: 10px; text-align: right; line-height: 1.6; }
+  .sh-right strong { font-size: 11px; }
+
+  /* ── 8개 섹션 가로 배치 ── */
+  .sections {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .sec {
+    border-right: 1px solid #d1d5db;
+    padding: 9px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    overflow: hidden;
+    font-size: 10px;
+    line-height: 1.45;
+    color: #1a1a1a;
+  }
+  .sec:last-child { border-right: none; }
+
+  .sec-title {
+    font-size: 10px;
+    font-weight: 900;
+    color: #fff;
+    background: #1a3557;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    width: fit-content;
+  }
+  .sec-title .num {
+    background: rgba(255,255,255,0.25);
+    border-radius: 2px;
+    padding: 0 4px;
+    font-size: 9px;
+  }
+
+  h4 {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #1a3557;
+    border-bottom: 1px solid #dbeafe;
+    padding-bottom: 2px;
+    margin: 4px 0 2px;
+  }
+
+  ul { padding-left: 12px; }
+  ul li { margin-bottom: 1px; font-size: 9.5px; }
+  p { font-size: 9.5px; margin-bottom: 3px; }
+
+  /* ── 비교 박스 ── */
+  .box-bad  { background: #fff0f0; border-left: 2px solid #e53e3e; border-radius: 3px; padding: 4px 6px; margin-bottom: 4px; }
+  .box-good { background: #f0fff4; border-left: 2px solid #22c55e; border-radius: 3px; padding: 4px 6px; margin-bottom: 4px; }
+  .box-title { font-weight: 700; font-size: 9px; margin-bottom: 2px; }
+  .box-bad  .box-title { color: #c53030; }
+  .box-good .box-title { color: #276749; }
+
+  /* ── 아이디어 카드 ── */
+  .idea-card { background: #eef4ff; border-radius: 4px; padding: 5px 7px; margin-bottom: 4px; }
+  .idea-card .ic-title { font-weight: 700; font-size: 9px; color: #1a3557; margin-bottom: 2px; }
+
+  /* ── 계획 테이블 ── */
+  .plan-table { width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 4px; }
+  .plan-table th { background: #1a3557; color: #fff; padding: 2px 4px; text-align: left; }
+  .plan-table td { padding: 2px 4px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  .plan-table tr:nth-child(even) td { background: #f8fafc; }
+  .badge { font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 99px; }
+  .badge-done { background: #dcfce7; color: #166534; }
+
+  /* ── 아키 흐름 ── */
+  .arch-flow { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; margin-bottom: 4px; }
+  .arch-box  { background: #eef4ff; border: 1px solid #93c5fd; border-radius: 3px; padding: 3px 6px; font-size: 8.5px; font-weight: 700; color: #1e40af; text-align: center; white-space: nowrap; }
+  .arch-box.main { background: #1a3557; color: #fff; border-color: #1a3557; }
+  .arch-box.hw   { background: #f0fff4; border-color: #22c55e; color: #166534; }
+  .arch-arrow { color: #94a3b8; font-size: 10px; }
+  .arch-lbl { font-size: 8px; color: #64748b; }
+
+  /* ── 수식 ── */
+  .formula { background: #1a3557; color: #7dd3fc; font-family: 'Courier New', monospace; font-size: 10px; padding: 4px 8px; border-radius: 3px; margin: 3px 0; }
+
+  /* ── 결과 수치 ── */
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+  .result-num { background: #1a3557; color: #fff; border-radius: 4px; padding: 5px 6px; text-align: center; }
+  .result-num .n { font-size: 16px; font-weight: 900; color: #7dd3fc; line-height: 1.1; }
+  .result-num .l { font-size: 8px; color: #94a3b8; margin-top: 1px; }
+
+  /* ── Ablation 테이블 ── */
+  .abl-table { width: 100%; border-collapse: collapse; font-size: 8.5px; margin-bottom: 3px; }
+  .abl-table th { background: #1a3557; color: #fff; padding: 2px 4px; text-align: center; }
+  .abl-table th:first-child { text-align: left; }
+  .abl-table td { padding: 2px 4px; border-bottom: 1px solid #e2e8f0; text-align: center; }
+  .abl-table td:first-child { text-align: left; font-weight: 600; }
+  .abl-table tr:last-child td { border-bottom: none; }
+  .abl-table tr.best td { background: #f0fff4; }
+  .v-g { color: #166534; font-weight: 700; }
+  .v-m { color: #92400e; font-weight: 700; }
+  .v-w { color: #475569; font-style: italic; }
+
+  /* ── 기대효과 ── */
+  .effect-row { display: flex; gap: 5px; align-items: flex-start; padding: 3px 0; border-bottom: 1px solid #e2e8f0; }
+  .effect-row:last-child { border-bottom: none; }
+  .eff-icon { font-size: 13px; flex-shrink: 0; }
+  .eff-title { font-weight: 700; font-size: 9px; color: #1a3557; }
+  .eff-body  { font-size: 8.5px; color: #444; margin-top: 1px; }
+
+  /* ── 성능 검증 테이블 ── */
+  .kpi-row { display: flex; gap: 4px; margin-bottom: 4px; }
+  .kpi { flex: 1; background: #1a3557; color: #fff; border-radius: 4px; padding: 4px 6px; text-align: center; }
+  .kpi .kn { font-size: 15px; font-weight: 900; color: #7dd3fc; line-height: 1.1; }
+  .kpi .kl { font-size: 7.5px; color: #94a3b8; }
+
+  code {
+    background: #f1f5f9;
+    padding: 0 3px;
+    border-radius: 2px;
+    font-size: 8.5px;
+    font-family: monospace;
+  }
+
+  /* ── 인쇄 ── */
+  @media print {
+    body { background: #fff; padding: 0; }
+    .strip { box-shadow: none; }
+    .print-guide { display: none !important; }
+  }
+
+  /* ── 안내 ── */
+  .print-guide {
+    margin: 12px auto;
+    width: 3200px;
+    background: #1e293b;
+    color: #94a3b8;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 12px;
+    display: flex;
+    gap: 32px;
+    align-items: center;
+    font-family: monospace;
+  }
+  .print-guide strong { color: #38bdf8; }
+</style>
+</head>
+<body>
+
+<div class="print-guide">
+  <span>📐 <strong>캡쳐 방법</strong>: 브라우저 줌 100% 고정 → 전체화면 스크린샷 → 스트립 영역(3200×600)만 크롭</span>
+  <span>또는: <strong>Ctrl+P → PDF 저장</strong> 후 이미지 추출</span>
+  <span>비율: <strong>16 : 3</strong> (3200 × 600 px)</span>
+</div>
+
+<div class="strip">
+
+  <!-- ── 헤더 바 ── -->
+  <div class="strip-header">
+    <div class="sh-left">강남대학교<br>2026 캡스톤 경진대회</div>
+    <div class="sh-title">
+      <div class="t1">MoNa-pi : Flow Matching 기반 고주파 모바일 내비게이션 VLA</div>
+      <div class="t2">π0 아키텍처의 모바일 로봇 도메인 전이 — 언어 명령 기반 연속 속도 제어</div>
+    </div>
+    <div class="sh-right"><strong>Team MonaF</strong><br>임현우 · 정재현 · 오은석<br>지도교수: ○○○ 교수님</div>
+  </div>
+
+  <!-- ── 8섹션 가로 배열 ── -->
+  <div class="sections">
+
+    <!-- ① 문제 정의 -->
+    <div class="sec">
+      <div class="sec-title"><span class="num">1</span> 문제 정의</div>
+      <div class="box-bad">
+        <div class="box-title">❌ 기존 VLA의 한계</div>
+        <ul>
+          <li>로봇 팔(Manipulation) 중심 — 모바일 미지원</li>
+          <li>이산 분류(3~9클래스) → 연속 제어 불가</li>
+          <li>Diffusion: 100+ ODE steps → 느린 추론</li>
+          <li>언어 이해 능력 제한적</li>
+        </ul>
+      </div>
+      <div class="box-good">
+        <div class="box-title">✅ MoNa-pi의 접근</div>
+        <ul>
+          <li>π0 VLA를 모바일 도메인으로 전이</li>
+          <li>연속 3-DOF 속도 벡터 직접 출력</li>
+          <li>5-step ODE → 50Hz 실시간 가능</li>
+          <li>PaliGemma 3B — 자연어 명령 이해</li>
+        </ul>
+      </div>
+      <p style="font-size:9px;color:#555;"><strong>연구 질문:</strong> 244 에피소드로 모바일 내비게이션 VLA 학습이 가능한가?</p>
+    </div>
+
+    <!-- ② 아이디어 개요 -->
+    <div class="sec">
+      <div class="sec-title"><span class="num">2</span> 아이디어 개요</div>
+      <div class="idea-card">
+        <div class="ic-title">🔑 도메인 전이(Domain Transfer)</div>
+        <p style="font-size:9px;">로봇 팔 조작용 π0 VLA →<br>실내 모바일 로봇 내비게이션으로 파인튜닝</p>
+      </div>
+      <h4>아키텍처</h4>
+      <div class="arch-flow">
+        <div class="arch-box">이미지<br><span class="arch-lbl">224px</span></div>
+        <div class="arch-arrow">+</div>
+        <div class="arch-box">언어 명령</div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box main">PaliGemma<br><span style="font-size:7px;opacity:.75">3B VLM</span></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box main">FlowHead</div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box hw">3-DOF<br><span class="arch-lbl">×10 chunk</span></div>
+      </div>
+      <h4>차별점</h4>
+      <ul>
+        <li><strong>연속 벡터:</strong> (vx, vy, wz) 직접 생성</li>
+        <li><strong>Action Chunking:</strong> 10스텝 → 50Hz 제어</li>
+        <li><strong>IntentPrefixInjector:</strong> 9-class 의도 태그</li>
+        <li><strong>소규모 데이터:</strong> 244 에피소드 규모</li>
+      </ul>
+    </div>
+
+    <!-- ③ 과제 추진 계획 -->
+    <div class="sec">
+      <div class="sec-title"><span class="num">3</span> 과제 추진 계획</div>
+      <table class="plan-table">
+        <thead><tr><th>단계</th><th>내용</th><th>시기</th><th>상태</th></tr></thead>
+        <tbody>
+          <tr><td><strong>데이터 수집</strong></td><td>Serbot2 실주행, 244 에피소드 규모</td><td>4~5월</td><td><span class="badge badge-done">완료</span></td></tr>
+          <tr><td><strong>모델 학습</strong></td><td>PaliGemma+FlowHead, BF16, 30 Epoch</td><td>5월</td><td><span class="badge badge-done">완료</span></td></tr>
+          <tr><td><strong>Ablation</strong></td><td>M1~M7 (Backbone/Expert/LoRA/ODE)</td><td>5~6월</td><td><span class="badge badge-done">완료</span></td></tr>
+          <tr><td><strong>오프라인 평가</strong></td><td>CL Simulation, FPE/TLD 검증</td><td>6월</td><td><span class="badge badge-done">완료</span></td></tr>
+          <tr><td><strong>실기동 배포</strong></td><td>INT8 양자화, FastAPI 서버</td><td>6월</td><td><span class="badge badge-done">완료</span></td></tr>
+        </tbody>
+      </table>
+      <h4>팀원 역할</h4>
+      <table class="plan-table">
+        <tbody>
+          <tr><td><strong>임현우</strong></td><td>모델 설계·학습·추론서버·평가</td></tr>
+          <tr><td><strong>정재현</strong></td><td>데이터 수집·ROS2 통합·실기동</td></tr>
+          <tr><td><strong>오은석</strong></td><td>데이터 수집·실험 보조·발표</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ④ 기대효과 -->
+    <div class="sec">
+      <div class="sec-title"><span class="num">4</span> 기대효과 및 활용방안</div>
+      <h4>연구 기여</h4>
+      <div class="effect-row">
+        <div class="eff-icon">🔬</div>
+        <div><div class="eff-title">모바일 도메인 전이 성공</div><div class="eff-body">π0 VLA를 실내 모바일 내비게이션에 최초 적용 — 정형 경로 SR 100%</div></div>
+      </div>
+      <div class="effect-row">
+        <div class="eff-icon">📦</div>
+        <div><div class="eff-title">소규모 데이터 학습 파이프라인</div><div class="eff-body">244 에피소드 규모로 VLA 학습 가능한 경량 프레임워크 제시</div></div>
+      </div>
+      <div class="effect-row">
+        <div class="eff-icon">🏭</div>
+        <div><div class="eff-title">산업적 활용</div><div class="eff-body">실내 배송·안내·물류창고 자율주행 등 서비스 로봇 전반 확장 가능</div></div>
+      </div>
+      <div class="effect-row">
+        <div class="eff-icon">🚀</div>
+        <div><div class="eff-title">확장성</div><div class="eff-body">GemmaExpert·LoRA 등 다양한 변형 지원, 신규 환경 파인튜닝 비용 최소화</div></div>
+      </div>
+    </div>
+
+    <!-- ⑤ 시스템 구성도 -->
+    <div class="sec">
+      <div class="sec-title"><span class="num">5</span> 시스템 구성도</div>
+      <h4>입력 → 처리 → 출력</h4>
+      <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:4px;">
+        <div class="arch-flow">
+          <div class="arch-box hw">카메라<br><span class="arch-lbl">30fps</span></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box">ROS2<br><span class="arch-lbl">/cam_high</span></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box main">FastAPI 서버<br><span style="font-size:7px;opacity:.75">:8082</span></div>
+        </div>
+        <div style="text-align:center;color:#64748b;font-size:8.5px;">↓ POST /predict</div>
+        <div class="arch-flow">
+          <div class="arch-box main">PaliGemma<br><span style="font-size:7px;opacity:.75">BF16/INT8</span></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box main">FlowHead<br><span style="font-size:7px;opacity:.75">Heun 5-step</span></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box">Chunk<br><span class="arch-lbl">10×3</span></div>
+        </div>
+        <div style="text-align:center;color:#64748b;font-size:8.5px;">↓ ActionChunkBuffer (RH 50%)</div>
+        <div class="arch-flow">
+          <div class="arch-box hw">/cmd_vel<br><span class="arch-lbl">10Hz</span></div>
+          <div class="arch-arrow">→</div>
+          <div class="arch-box hw">Serbot2<br><span class="arch-lbl">Mecanum</span></div>
+        </div>
+      </div>
+      <h4>하드웨어</h4>
+      <table class="plan-table">
+        <tbody>
+          <tr><td><strong>로봇</strong></td><td>Serbot2 (4-wheel Mecanum)</td></tr>
+          <tr><td><strong>학습</strong></td><td>ASCENT GX10 (A5000)</td></tr>
+          <tr><td><strong>온보드</strong></td><td>Jetson AGX (INT8)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ⑥ 핵심 기술 -->
+    <div class="sec">
+      <div class="sec-title"><span class="num">6</span> 핵심 기술</div>
+      <h4>① Conditional Flow Matching</h4>
+      <div class="formula">L = ‖ v_θ(x_t, t, c) − (x₁ − x₀) ‖²</div>
+      <p style="font-size:8.5px;color:#555;">x₀~N(0,I), x₁=목표액션, 5-step Heun ODE</p>
+      <h4>② PaliGemma 3B (BF16)</h4>
+      <ul>
+        <li>SigLIP 비전 인코더 → 이미지 임베딩</li>
+        <li>Gemma-2B → 언어-비전 통합 표현</li>
+        <li>FP16 NaN → BF16 전환으로 해결</li>
+      </ul>
+      <h4>③ IntentPrefixInjector</h4>
+      <p style="font-size:8.5px;"><code>[FORWARD]</code> <code>[STRAFE_LEFT]</code> <code>[ROT_RIGHT]</code> 등 9-class 태그 자동 주입</p>
+      <h4>④ Action Chunking</h4>
+      <ul>
+        <li>10스텝 청크 생성, 버퍼 50% 소진 시 재계획</li>
+        <li>10Hz 제어 루프 → 50Hz 연속 제어</li>
+      </ul>
+    </div>
+
+    <!-- ⑦ 구현 결과 -->
+    <div class="sec">
+      <div class="sec-title"><span class="num">7</span> 구현 결과</div>
+      <div class="result-grid">
+        <div class="result-num"><div class="n">100%</div><div class="l">정형 경로 SR</div></div>
+        <div class="result-num"><div class="n">73.6%</div><div class="l">전체 SR (M1)</div></div>
+        <div class="result-num"><div class="n" style="color:#fbbf24;">5-step</div><div class="l">ODE 추론</div></div>
+        <div class="result-num"><div class="n" style="color:#fbbf24;">244ep</div><div class="l">학습 데이터 규모</div></div>
+      </div>
+      <h4>Ablation 비교</h4>
+      <table class="abl-table">
+        <thead><tr><th>모델</th><th>정형</th><th>전체</th></tr></thead>
+        <tbody>
+          <tr class="best"><td>M1 Base PG</td><td class="v-g">100%</td><td class="v-g">73.6%</td></tr>
+          <tr><td>M2 LeRobot</td><td class="v-g">100%</td><td class="v-g">73.6%</td></tr>
+          <tr><td>M3 LoRA r16</td><td class="v-m">97.4%</td><td class="v-g">75.5%</td></tr>
+          <tr><td>M4 GemmaExp</td><td class="v-g">100%</td><td class="v-g">75.5%</td></tr>
+          <tr><td>M5 No-Aug</td><td class="v-w">—</td><td class="v-w">—</td></tr>
+          <tr><td>M7 116ep</td><td class="v-w">—</td><td class="v-w">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ⑧ 성능 검증 -->
+    <div class="sec">
+      <div class="sec-title"><span class="num">8</span> 성능 검증</div>
+      <h4>CL 시뮬레이션 지표</h4>
+      <table class="plan-table">
+        <thead><tr><th>지표</th><th>정의</th><th>성공 기준</th></tr></thead>
+        <tbody>
+          <tr><td><strong>FPE</strong></td><td>최종 위치 오차(m)</td><td>&lt; 0.3m</td></tr>
+          <tr><td><strong>TLD</strong></td><td>이동거리/GT거리</td><td>0.7~1.5</td></tr>
+        </tbody>
+      </table>
+      <h4>검증 결과</h4>
+      <table class="abl-table">
+        <thead><tr><th>경로 유형</th><th>SR</th></tr></thead>
+        <tbody>
+          <tr class="best"><td>정형 9종 경로</td><td class="v-g">100%</td></tr>
+          <tr><td>add_free (대각선 등)</td><td class="v-m">13%</td></tr>
+          <tr class="best"><td><strong>전체</strong></td><td class="v-g"><strong>73.6%</strong></td></tr>
+        </tbody>
+      </table>
+      <h4>일반화 격차 원인</h4>
+      <p style="font-size:8.5px;">add_free 실패 주요 원인: <strong>TLD &lt; 0.7</strong> (조기 정지). 방향은 정확하나 거리 추정 부족 → 데이터 보강 또는 정지 판단 모듈로 개선 가능</p>
+    </div>
+
+  </div><!-- /sections -->
+</div><!-- /strip -->
+
+</body>
+</html>
