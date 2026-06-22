@@ -1,0 +1,50 @@
+# M5 복구 및 이어서 학습 (기존 best 가중치 로드 후 10 epoch 추가 학습)
+model:
+  action_dim: 3
+  horizon: 10
+  hidden_dim: 512
+  n_flow_steps: 50
+  use_paligemma: true
+  load_pretrained_paligemma: true
+  paligemma_id: "google/paligemma-3b-pt-224"
+  vision_model_id: "google/siglip-so400m-patch14-384"
+  lang_model_id: "google/gemma-2b"
+  use_gemma_expert: false
+  use_lora: false
+  use_int8: false
+
+data:
+  train_path: /home/minum/26CS/MoNa-pi/mobile_vla_dataset_merged/
+  val_split: 0.1
+  window_size: 8
+  image_size: 224
+  preprocess: true
+  smooth: true
+  normalize: false
+  inject_prefix: true
+  use_delta: false
+  augment: false          # 증강 OFF 유지
+  use_color_jitter: false
+  use_random_crop: false
+  use_counterfactual: false
+  cf_stop_prob: 0.0
+  cf_steer_prob: 0.0
+
+train:
+  batch_size: 4
+  lr: 2.0e-5              # 이어서 학습하므로 학습률을 조금 낮춰 안정적으로 튜닝
+  epochs: 10              # 남은 분량 10 epoch 학습
+  warmup_steps: 100
+  grad_clip: 1.0
+  checkpoint_dir: checkpoints/no_aug/
+  keep_top_k: 3
+  seed: 42
+
+pretrain:
+  ckpt_path: "checkpoints/no_aug/best" # 기존 저장된 최적 가중치 활용
+
+logging:
+  use_wandb: false
+  project: mona-pi
+  entity: shosae
+  log_every_n_steps: 20

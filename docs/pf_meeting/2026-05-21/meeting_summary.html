@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoNa-pi 지도교수 미팅 — 2026년 5월 21일</title>
+<style>
+  :root{--bg:#0a0f1a;--surface:#111827;--surface2:#1e293b;--border:#1e293b;--text:#f1f5f9;--muted:#94a3b8;--accent:#38bdf8;--green:#22c55e;--red:#ef4444;--yellow:#fbbf24;--purple:#a78bfa;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+  .hero{background:linear-gradient(135deg,#0f172a 0%,#0d2b1a 50%,#0f172a 100%);padding:64px 40px;text-align:center;border-bottom:1px solid #1e293b;}
+  .hero-badge{display:inline-block;background:#1e293b;border:1px solid #334155;color:var(--muted);font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:4px 14px;border-radius:99px;margin-bottom:20px;}
+  .hero h1{font-size:2.8rem;font-weight:900;background:linear-gradient(90deg,#22c55e,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px;}
+  .hero .subtitle{color:var(--muted);font-size:1rem;max-width:640px;margin:0 auto 32px;}
+  .meta-row{display:flex;gap:32px;justify-content:center;flex-wrap:wrap;color:var(--muted);font-size:0.85rem;}
+  .kpi-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:32px;}
+  .kpi{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:18px 28px;text-align:center;}
+  .kpi .num{font-size:2rem;font-weight:900;}
+  .kpi .lbl{color:var(--muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+  .chapter{max-width:960px;margin:0 auto;padding:52px 40px;}
+  .chapter-header{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+  .chapter-num{background:var(--green);color:#0a0f1a;font-weight:900;font-size:0.8rem;padding:4px 12px;border-radius:20px;white-space:nowrap;}
+  .chapter-title{font-size:1.7rem;font-weight:800;}
+  hr.divider{border:none;border-top:1px solid #1e293b;margin:0 40px;}
+  .finding-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:28px;}
+  .finding-card{background:var(--surface);border-radius:12px;padding:20px;border-left:4px solid;}
+  .finding-card.good{border-color:var(--green);}
+  .finding-card.info{border-color:var(--accent);}
+  .finding-card.warn{border-color:var(--yellow);}
+  .finding-card.bad{border-color:var(--red);}
+  .finding-card.purple{border-color:var(--purple);}
+  .finding-title{font-weight:700;font-size:0.95rem;margin-bottom:8px;}
+  .finding-body{color:var(--muted);font-size:0.87rem;line-height:1.65;}
+  .tag{display:inline-block;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:2px 8px;border-radius:99px;margin-bottom:8px;}
+  .tag.done{background:rgba(34,197,94,0.15);color:#22c55e;}
+  .tag.fix{background:rgba(239,68,68,0.15);color:#ef4444;}
+  .tag.new{background:rgba(56,189,248,0.15);color:#38bdf8;}
+  .tag.plan{background:rgba(167,139,250,0.15);color:#a78bfa;}
+  code{background:#0f172a;padding:2px 6px;border-radius:4px;font-size:0.8rem;font-family:monospace;}
+  .compare-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:12px;overflow:hidden;margin-bottom:24px;}
+  .compare-table th{background:#0b1220;padding:12px 18px;text-align:left;color:var(--muted);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.5px;}
+  .compare-table td{padding:14px 18px;border-bottom:1px solid #1e293b;font-size:0.88rem;vertical-align:middle;}
+  .compare-table tr:last-child td{border-bottom:none;}
+  .val-good{color:#22c55e;font-weight:700;}
+  .val-bad{color:#ef4444;font-weight:700;}
+  .callout{border-radius:10px;padding:16px 20px;margin-bottom:20px;line-height:1.7;font-size:0.9rem;}
+  .callout.info{background:#0c2340;border-left:4px solid var(--accent);color:#bae6fd;}
+  .callout.success{background:#052e16;border-left:4px solid var(--green);color:#bbf7d0;}
+  .callout.warn{background:#2d1b00;border-left:4px solid var(--yellow);color:#fde68a;}
+  .metric-pill{display:inline-flex;align-items:center;gap:6px;background:#1e293b;border:1px solid #334155;border-radius:99px;padding:4px 12px;font-size:0.8rem;margin:4px 4px 0 0;}
+  .metric-pill .k{color:var(--muted);}
+  .metric-pill .v{color:var(--text);font-weight:700;}
+  .arch-box-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+  .arch-box{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px 16px;font-size:0.85rem;text-align:center;}
+  .arch-box.hl{border-color:var(--accent);color:var(--accent);}
+  .arch-arrow{color:var(--muted);font-size:1.3rem;}
+  #pdf-btn{position:fixed;bottom:24px;right:24px;z-index:999;background:#22c55e;color:#0a0f1a;font-weight:900;font-size:0.82rem;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;box-shadow:0 4px 16px rgba(34,197,94,0.4);}
+  @media print{
+    #pdf-btn{display:none!important;}
+    body{background:#fff!important;color:#111!important;}
+    :root{--bg:#fff;--surface:#f8f9fa;--text:#111;--muted:#555;}
+    .hero{background:#f1f5f9!important;}
+    .hero h1{-webkit-text-fill-color:#111!important;background:none!important;}
+  }
+</style>
+</head>
+<body>
+<button id="pdf-btn" onclick="window.print()">🖨 PDF 저장</button>
+
+<!-- ══ HERO ══ -->
+<div class="hero">
+  <div class="hero-badge">MoNa-pi · 지도교수 미팅</div>
+  <h1>CH 2 — 데이터셋 확장 & 학습 안정화</h1>
+  <p class="subtitle">116 → 244 에피소드 확장, BF16 전환, IntentPrefixInjector 설계, Closed-Loop 평가 프레임워크 확정</p>
+  <div class="meta-row">
+    <span>📅 2026년 5월 21일</span>
+    <span>📍 지도교수 연구실</span>
+    <span>👤 지도교수님 · 팀장 임현우</span>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="num" style="color:#22c55e">244</div><div class="lbl">에피소드 (↑116)</div></div>
+    <div class="kpi"><div class="num" style="color:#38bdf8">BF16</div><div class="lbl">dtype 전환</div></div>
+    <div class="kpi"><div class="num" style="color:#a78bfa">9</div><div class="lbl">Intent 클래스</div></div>
+    <div class="kpi"><div class="num" style="color:#fbbf24">0.3m</div><div class="lbl">FPE 성공 기준</div></div>
+  </div>
+</div>
+
+<!-- ══ 완료 사항 ══ -->
+<section class="chapter" id="ch1">
+  <div class="chapter-header">
+    <span class="chapter-num">완료 사항</span>
+    <h2 class="chapter-title">이번 미팅까지 달성한 것</h2>
+  </div>
+
+  <div class="finding-grid">
+    <div class="finding-card good">
+      <span class="tag done">완료</span>
+      <div class="finding-title">데이터셋 확장 — 116 → 244 에피소드</div>
+      <div class="finding-body">
+        v5 데이터셋 구축 완료. 정형 9종 경로(center/left/right × straight/left/right)에 add_free 시나리오(대각선, 극단 위치, 조명 차이) 추가.
+        Random Crop 및 CFG(Classifier-Free Guidance) 증강 적용.
+      </div>
+    </div>
+    <div class="finding-card bad">
+      <span class="tag fix">버그 수정</span>
+      <div class="finding-title">FP16 NaN 그라디언트 → BF16 전환</div>
+      <div class="finding-body">
+        FP16 학습 시 TimestepEmbedder에서 오버플로우 발생 → <code>torch.bfloat16</code> 전면 전환으로 해결.
+        val_loss 0.07대까지 안정 수렴 확인.
+      </div>
+    </div>
+    <div class="finding-card info">
+      <span class="tag new">신규</span>
+      <div class="finding-title">IntentPrefixInjector 설계 완료</div>
+      <div class="finding-body">
+        언어 명령에 9-class 의도 태그를 자동 주입하는 모듈 완성.
+        <code>[FORWARD]</code> <code>[STRAFE_LEFT]</code> <code>[ROT_RIGHT]</code> 등.
+        학습 시 95%, 추론 시 100% 태그 적용으로 일관성 확보.
+      </div>
+    </div>
+    <div class="finding-card purple">
+      <span class="tag new">설계 완료</span>
+      <div class="finding-title">오프라인 Closed-Loop 평가 프레임워크</div>
+      <div class="finding-body">
+        GT 이미지 순차 공급 + 액션 closed-loop 방식. 성공 기준 확정:
+        <br><strong>FPE &lt; 0.3m</strong> AND <strong>TLD ∈ [0.7, 1.5]</strong>
+        <br>이후 모든 Ablation 실험의 공통 지표로 사용.
+      </div>
+    </div>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ══ FP16 vs BF16 ══ -->
+<section class="chapter" id="ch2">
+  <div class="chapter-header">
+    <span class="chapter-num">핵심 수정</span>
+    <h2 class="chapter-title">FP16 → BF16 전환 이유</h2>
+  </div>
+
+  <table class="compare-table">
+    <thead><tr><th>항목</th><th>FP16 (기존)</th><th>BF16 (현재)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>지수 비트</strong></td><td class="val-bad">5 bit</td><td class="val-good">8 bit (FP32와 동일)</td></tr>
+      <tr><td><strong>표현 범위</strong></td><td class="val-bad">±65,504</td><td class="val-good">±3.4 × 10³⁸</td></tr>
+      <tr><td><strong>TimestepEmbedder NaN</strong></td><td class="val-bad">발생 (오버플로우)</td><td class="val-good">없음</td></tr>
+      <tr><td><strong>val_loss 수렴</strong></td><td class="val-bad">발산 / NaN</td><td class="val-good">0.074 안정 수렴</td></tr>
+      <tr><td><strong>Jetson 지원</strong></td><td>지원</td><td class="val-good">지원 (Ampere+)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <strong>주의:</strong> 모든 <code>torch.float16</code>·<code>.half()</code>·<code>.to(torch.float16)</code>를 <code>torch.bfloat16</code>으로 교체.
+    <code>inference/engine.py</code>의 <code>.half()</code>도 제거 필요 (그렇지 않으면 배포 시 BF16 가중치가 FP16으로 재변환됨).
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ══ CL 평가 설계 ══ -->
+<section class="chapter" id="ch3">
+  <div class="chapter-header">
+    <span class="chapter-num">평가 설계</span>
+    <h2 class="chapter-title">Closed-Loop 평가 기준 확정</h2>
+  </div>
+
+  <div class="arch-box-row">
+    <div class="arch-box">GT 이미지 (step별)</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box hl">MoNa-pi 모델</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box">액션 청크 (10×3)</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box">시뮬레이션 위치 업데이트</div>
+    <div class="arch-arrow">→</div>
+    <div class="arch-box hl">FPE / TLD 계산</div>
+  </div>
+
+  <div class="finding-grid">
+    <div class="finding-card info">
+      <div class="finding-title">FPE — Final Position Error</div>
+      <div class="finding-body">
+        에피소드 종료 시 추정 위치와 GT 목표 위치 간 유클리드 거리.
+        <br><strong>성공 기준: FPE &lt; 0.3m</strong>
+      </div>
+    </div>
+    <div class="finding-card info">
+      <div class="finding-title">TLD — Trajectory Length Deviation</div>
+      <div class="finding-body">
+        모델이 이동한 총 거리 / GT 경로 총 거리. 1.0 = 동일한 거리.
+        <br><strong>성공 기준: 0.7 ≤ TLD ≤ 1.5</strong>
+        <br>1.5 초과 = 지나침, 0.7 미만 = 조기 정지
+      </div>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <strong>협의 결론:</strong> 이 두 지표(FPE + TLD)가 이후 모든 Ablation 실험(M1–M7)의 공통 성공 기준으로 채택됨.
+    정형 9종 경로(Regular)와 add_free 시나리오 두 세트에 대해 각각 측정.
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoNa-pi 지도교수 미팅 — 2026년 5월 27일</title>
+<style>
+  :root{--bg:#0a0f1a;--surface:#111827;--surface2:#1e293b;--border:#1e293b;--text:#f1f5f9;--muted:#94a3b8;--accent:#38bdf8;--green:#22c55e;--red:#ef4444;--yellow:#fbbf24;--purple:#a78bfa;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+  .hero{background:linear-gradient(135deg,#0f172a 0%,#1a0e2e 50%,#0f172a 100%);padding:64px 40px;text-align:center;border-bottom:1px solid #1e293b;}
+  .hero-badge{display:inline-block;background:#1e293b;border:1px solid #334155;color:var(--muted);font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:4px 14px;border-radius:99px;margin-bottom:20px;}
+  .hero h1{font-size:2.8rem;font-weight:900;background:linear-gradient(90deg,#a78bfa,#38bdf8,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px;}
+  .hero .subtitle{color:var(--muted);font-size:1rem;max-width:680px;margin:0 auto 32px;}
+  .meta-row{display:flex;gap:32px;justify-content:center;flex-wrap:wrap;color:var(--muted);font-size:0.85rem;}
+  .kpi-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:32px;}
+  .kpi{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:18px 28px;text-align:center;}
+  .kpi .num{font-size:2rem;font-weight:900;}
+  .kpi .lbl{color:var(--muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+  .chapter{max-width:1020px;margin:0 auto;padding:52px 40px;}
+  .chapter-header{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+  .chapter-num{background:var(--purple);color:#0a0f1a;font-weight:900;font-size:0.8rem;padding:4px 12px;border-radius:20px;white-space:nowrap;}
+  .chapter-title{font-size:1.7rem;font-weight:800;}
+  hr.divider{border:none;border-top:1px solid #1e293b;margin:0 40px;}
+  .finding-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:28px;}
+  .finding-card{background:var(--surface);border-radius:12px;padding:20px;border-left:4px solid;}
+  .finding-card.good{border-color:var(--green);}
+  .finding-card.info{border-color:var(--accent);}
+  .finding-card.warn{border-color:var(--yellow);}
+  .finding-card.purple{border-color:var(--purple);}
+  .finding-title{font-weight:700;font-size:0.95rem;margin-bottom:8px;}
+  .finding-body{color:var(--muted);font-size:0.87rem;line-height:1.65;}
+  .tag{display:inline-block;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:2px 8px;border-radius:99px;margin-bottom:8px;}
+  .tag.done{background:rgba(34,197,94,0.15);color:#22c55e;}
+  .tag.plan{background:rgba(56,189,248,0.15);color:#38bdf8;}
+  .tag.present{background:rgba(251,191,36,0.15);color:#fbbf24;}
+  .tag.new{background:rgba(167,139,250,0.15);color:#a78bfa;}
+  code{background:#0f172a;padding:2px 6px;border-radius:4px;font-size:0.8rem;font-family:monospace;}
+
+  /* Ablation 매트릭스 테이블 */
+  .abl-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:12px;overflow:hidden;margin-bottom:24px;}
+  .abl-table th{background:#0b1220;color:var(--muted);font-size:0.78rem;letter-spacing:0.07em;text-transform:uppercase;padding:10px 16px;border-bottom:1px solid var(--border);}
+  .abl-table th:first-child{text-align:left;}
+  .abl-table td{padding:12px 16px;border-bottom:1px solid rgba(51,65,85,0.5);background:var(--surface);font-size:0.88rem;text-align:center;}
+  .abl-table td:first-child{text-align:left;font-weight:700;}
+  .abl-table tr:last-child td{border-bottom:none;}
+  .abl-id{display:inline-block;background:#1e293b;color:var(--accent);font-size:0.72rem;font-weight:900;padding:2px 8px;border-radius:99px;margin-right:6px;}
+
+  /* 발표 흐름 */
+  .flow-list{list-style:none;margin-bottom:24px;}
+  .flow-list li{display:flex;gap:14px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #1e293b;}
+  .flow-list li:last-child{border-bottom:none;}
+  .flow-num{flex-shrink:0;width:28px;height:28px;background:var(--purple);color:#0a0f1a;border-radius:50%;font-weight:900;font-size:0.8rem;display:flex;align-items:center;justify-content:center;}
+  .flow-title{font-weight:700;font-size:0.9rem;margin-bottom:2px;}
+  .flow-time{color:var(--muted);font-size:0.78rem;}
+
+  /* 배포 파이프라인 */
+  .deploy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:24px;}
+  .deploy-card{background:var(--surface);border-radius:10px;padding:18px;border-top:3px solid;}
+  .deploy-card.green{border-top-color:var(--green);}
+  .deploy-card.blue{border-top-color:var(--accent);}
+  .deploy-card.purple{border-top-color:var(--purple);}
+  .deploy-card.yellow{border-top-color:var(--yellow);}
+  .dc-label{color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+  .dc-val{font-weight:700;font-size:1rem;margin-bottom:4px;}
+  .dc-sub{color:var(--muted);font-size:0.8rem;}
+
+  .callout{border-radius:10px;padding:16px 20px;margin-bottom:20px;line-height:1.7;font-size:0.9rem;}
+  .callout.info{background:#0c2340;border-left:4px solid var(--accent);color:#bae6fd;}
+  .callout.warn{background:#2d1b00;border-left:4px solid var(--yellow);color:#fde68a;}
+  .callout.success{background:#052e16;border-left:4px solid var(--green);color:#bbf7d0;}
+
+  #pdf-btn{position:fixed;bottom:24px;right:24px;z-index:999;background:#a78bfa;color:#0a0f1a;font-weight:900;font-size:0.82rem;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;box-shadow:0 4px 16px rgba(167,139,250,0.4);}
+  @media print{
+    #pdf-btn{display:none!important;}
+    body{background:#fff!important;color:#111!important;}
+    :root{--bg:#fff;--surface:#f8f9fa;--text:#111;--muted:#555;}
+    .hero{background:#f1f5f9!important;}
+    .hero h1{-webkit-text-fill-color:#111!important;background:none!important;}
+  }
+</style>
+</head>
+<body>
+<button id="pdf-btn" onclick="window.print()">🖨 PDF 저장</button>
+
+<!-- ══ HERO ══ -->
+<div class="hero">
+  <div class="hero-badge">MoNa-pi · 지도교수 미팅</div>
+  <h1>CH 3 — Ablation 설계 & 배포 계획</h1>
+  <p class="subtitle">Ablation 매트릭스(M1–M7) 확정, GemmaExpert 구현, Serbot2 INT8 배포 계획, 6/4 발표 리허설 피드백</p>
+  <div class="meta-row">
+    <span>📅 2026년 5월 27일</span>
+    <span>📍 지도교수 연구실</span>
+    <span>👤 지도교수님 · 팀장 임현우</span>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="num" style="color:#a78bfa">7</div><div class="lbl">Ablation 실험</div></div>
+    <div class="kpi"><div class="num" style="color:#38bdf8">π0</div><div class="lbl">GemmaExpert 구현</div></div>
+    <div class="kpi"><div class="num" style="color:#22c55e">INT8</div><div class="lbl">Serbot2 배포</div></div>
+    <div class="kpi"><div class="num" style="color:#fbbf24">6/4</div><div class="lbl">캡스톤 발표</div></div>
+  </div>
+</div>
+
+<!-- ══ Ablation 매트릭스 ══ -->
+<section class="chapter" id="ch1">
+  <div class="chapter-header">
+    <span class="chapter-num">Ablation 설계</span>
+    <h2 class="chapter-title">M1–M7 실험 매트릭스 확정</h2>
+  </div>
+
+  <table class="abl-table">
+    <thead>
+      <tr><th>ID</th><th>변인</th><th>설정</th><th>비교 대상</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><span class="abl-id">M1</span>Base</td><td>베이스라인</td><td>base PaliGemma + 244ep + aug</td><td>— (기준)</td></tr>
+      <tr><td><span class="abl-id">M2</span>Backbone</td><td>Backbone 종류</td><td>lerobot π0 사전학습 가중치</td><td>M1 vs M2</td></tr>
+      <tr><td><span class="abl-id">M3</span>LoRA</td><td>파라미터 효율</td><td>LoRA rank=16, q/v/k/o_proj</td><td>M1 vs M3</td></tr>
+      <tr><td><span class="abl-id">M4</span>Expert</td><td>Action Expert</td><td>GemmaActionExpert (π0 구조)</td><td>M1 vs M4</td></tr>
+      <tr><td><span class="abl-id">M5</span>No-Aug</td><td>데이터 증강</td><td>244ep, 증강 없음</td><td>M1 vs M5</td></tr>
+      <tr><td><span class="abl-id">M6</span>ODE</td><td>추론 속도</td><td>ODE steps = 3 / 5 / 10</td><td>속도-성능 트레이드오프</td></tr>
+      <tr><td><span class="abl-id">M7</span>Data</td><td>데이터 크기</td><td>116ep + aug</td><td>M1(244ep) vs M7(116ep)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <strong>공통 평가 지표:</strong> 정형 9종 경로(Regular SR) + 전체 경로(Full SR). 성공 기준: FPE &lt; 0.3m AND TLD ∈ [0.7, 1.5].
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ══ GemmaExpert 구현 ══ -->
+<section class="chapter" id="ch2">
+  <div class="chapter-header">
+    <span class="chapter-num">핵심 구현</span>
+    <h2 class="chapter-title">GemmaActionExpert — 실제 π0 아키텍처</h2>
+  </div>
+
+  <div class="finding-grid">
+    <div class="finding-card purple">
+      <span class="tag done">구현 완료</span>
+      <div class="finding-title">GemmaActionExpert 구조</div>
+      <div class="finding-body">
+        Gemma 트랜스포머 레이어(4층, hidden=1024) 기반.
+        VLM 토큰 + 액션 토큰을 concat → 통합 self-attention.
+        진정한 π0 아키텍처 (FlowHead의 MLP 방식과 다름).
+      </div>
+    </div>
+    <div class="finding-card info">
+      <span class="tag done">완료</span>
+      <div class="finding-title">lerobot 가중치 추출 파이프라인</div>
+      <div class="finding-body">
+        <code>extract_lerobot_backbone.py</code> 완성.
+        lerobot/pi0_old → PaliGemma 602 레이어 + GemmaExpert 164 레이어 추출.
+        키 리맵: <code>vision_tower.vision_model.*</code> → <code>vision_tower.*</code>
+      </div>
+    </div>
+    <div class="finding-card warn">
+      <span class="tag new">LoRA</span>
+      <div class="finding-title">LoRA PEFT 적용 (M3)</div>
+      <div class="finding-body">
+        Gemma-2B의 <code>q/v/k/o_proj</code>에 rank=16 LoRA 적용.
+        추가 파라미터 +3.7M. 전체 파라미터 대비 약 0.12%.
+        학습 시 BF16 지원 확인.
+      </div>
+    </div>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ══ Serbot2 배포 계획 ══ -->
+<section class="chapter" id="ch3">
+  <div class="chapter-header">
+    <span class="chapter-num">배포 계획</span>
+    <h2 class="chapter-title">Serbot2 온보드 추론 서버</h2>
+  </div>
+
+  <div class="deploy-grid">
+    <div class="deploy-card green">
+      <div class="dc-label">양자화</div>
+      <div class="dc-val">INT8</div>
+      <div class="dc-sub">BF16 ~6GB → INT8 ~3GB</div>
+    </div>
+    <div class="deploy-card blue">
+      <div class="dc-label">스왑</div>
+      <div class="dc-val">24 GB</div>
+      <div class="dc-sub">fallocate + swapon 설정</div>
+    </div>
+    <div class="deploy-card purple">
+      <div class="dc-label">서버 포트</div>
+      <div class="dc-val">8082</div>
+      <div class="dc-sub">FastAPI + uvicorn</div>
+    </div>
+    <div class="deploy-card yellow">
+      <div class="dc-label">ODE steps</div>
+      <div class="dc-val">5</div>
+      <div class="dc-sub">Heun solver, 실기동 기본값</div>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <strong>배포 명령:</strong>
+    <code style="display:block;margin-top:8px;background:#0a0f1a;padding:10px 14px;border-radius:8px;font-size:0.82rem;">
+      python inference/server.py --config configs/serbot2.yaml --ckpt checkpoints/best
+    </code>
+    <br>MoNaVLA 호환 프로토콜 포함 — ros2_controller.py에서 기존 코드 그대로 연결 가능.
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ══ 발표 리허설 피드백 ══ -->
+<section class="chapter" id="ch4">
+  <div class="chapter-header">
+    <span class="chapter-num">발표 준비</span>
+    <h2 class="chapter-title">6/4 캡스톤 발표 리허설 피드백</h2>
+  </div>
+
+  <ul class="flow-list">
+    <li>
+      <div class="flow-num">1</div>
+      <div>
+        <div class="flow-title">기획 의도 & 차별성 <span class="tag present">~1분</span></div>
+        <div class="flow-time">이산 분류 VLA의 한계 → Flow Matching으로 연속 벡터필드 생성 → 모바일 도메인 전이</div>
+      </div>
+    </li>
+    <li>
+      <div class="flow-num">2</div>
+      <div>
+        <div class="flow-title">시스템 아키텍처 & 하드웨어 <span class="tag present">~1분 30초</span></div>
+        <div class="flow-time">Serbot2 + PaliGemma + FlowHead + ActionChunkBuffer + FastAPI 서버 구조</div>
+      </div>
+    </li>
+    <li>
+      <div class="flow-num">3</div>
+      <div>
+        <div class="flow-title">실험 환경 & 데이터셋 <span class="tag present">~30초</span></div>
+        <div class="flow-time">244 에피소드, 정형 9종 + add_free, CL 평가 지표(FPE/TLD)</div>
+      </div>
+    </li>
+    <li>
+      <div class="flow-num">4</div>
+      <div>
+        <div class="flow-title">핵심 정량 결과 <span class="tag present">~1분</span></div>
+        <div class="flow-time">정형 100% / 전체 73.6%, Ablation 비교표, ODE steps 영향 없음</div>
+      </div>
+    </li>
+    <li>
+      <div class="flow-num">5</div>
+      <div>
+        <div class="flow-title">기여 & 결론 <span class="tag present">~1분</span></div>
+        <div class="flow-time">모바일 도메인 전이 성공, 소규모 데이터 학습 파이프라인, 향후 계획은 Q&A에서</div>
+      </div>
+    </li>
+  </ul>
+
+  <div class="callout warn">
+    <strong>교수님 피드백 핵심:</strong> 발표 흐름에서 "왜 이걸 하는가"를 처음에 명확히 제시할 것. 처음 보는 청중이 맥락을 파악할 수 있도록 문제 정의 → 해결 방식 순으로 구성. 시간 내(10분) 준수 필수.
+  </div>
+</section>
+
+</body>
+</html>

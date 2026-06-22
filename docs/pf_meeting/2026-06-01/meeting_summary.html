@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoNa-pi 지도교수 미팅 — 2026년 6월 1일</title>
+<style>
+  :root{--bg:#0a0f1a;--surface:#111827;--surface2:#1e293b;--border:#1e293b;--text:#f1f5f9;--muted:#94a3b8;--accent:#38bdf8;--green:#22c55e;--red:#ef4444;--yellow:#fbbf24;--purple:#a78bfa;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+  .hero{background:linear-gradient(135deg,#0f172a 0%,#0d2224 50%,#0f172a 100%);padding:64px 40px;text-align:center;border-bottom:1px solid #1e293b;}
+  .hero-badge{display:inline-block;background:#1e293b;border:1px solid #334155;color:var(--muted);font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:4px 14px;border-radius:99px;margin-bottom:20px;}
+  .hero h1{font-size:2.8rem;font-weight:900;background:linear-gradient(90deg,#22c55e,#38bdf8,#22c55e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:12px;}
+  .hero .subtitle{color:var(--muted);font-size:1rem;max-width:680px;margin:0 auto 32px;}
+  .meta-row{display:flex;gap:32px;justify-content:center;flex-wrap:wrap;color:var(--muted);font-size:0.85rem;}
+  .kpi-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:32px;}
+  .kpi{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:18px 28px;text-align:center;}
+  .kpi .num{font-size:2rem;font-weight:900;}
+  .kpi .lbl{color:var(--muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;margin-top:4px;}
+  .chapter{max-width:1020px;margin:0 auto;padding:52px 40px;}
+  .chapter-header{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+  .chapter-num{background:var(--green);color:#0a0f1a;font-weight:900;font-size:0.8rem;padding:4px 12px;border-radius:20px;white-space:nowrap;}
+  .chapter-title{font-size:1.7rem;font-weight:800;}
+  hr.divider{border:none;border-top:1px solid #1e293b;margin:0 40px;}
+  .finding-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:28px;}
+  .finding-card{background:var(--surface);border-radius:12px;padding:20px;border-left:4px solid;}
+  .finding-card.good{border-color:var(--green);}
+  .finding-card.info{border-color:var(--accent);}
+  .finding-card.warn{border-color:var(--yellow);}
+  .finding-card.bad{border-color:var(--red);}
+  .finding-card.purple{border-color:var(--purple);}
+  .finding-title{font-weight:700;font-size:0.95rem;margin-bottom:8px;}
+  .finding-body{color:var(--muted);font-size:0.87rem;line-height:1.65;}
+  .tag{display:inline-block;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:2px 8px;border-radius:99px;margin-bottom:8px;}
+  .tag.done{background:rgba(34,197,94,0.15);color:#22c55e;}
+  .tag.wip{background:rgba(56,189,248,0.15);color:#38bdf8;}
+  .tag.fail{background:rgba(239,68,68,0.15);color:#ef4444;}
+  .tag.next{background:rgba(251,191,36,0.15);color:#fbbf24;}
+  code{background:#0f172a;padding:2px 6px;border-radius:4px;font-size:0.8rem;font-family:monospace;}
+
+  /* Ablation 결과 테이블 */
+  .abl-table{width:100%;border-collapse:separate;border-spacing:0;border-radius:12px;overflow:hidden;margin-bottom:24px;}
+  .abl-table th{background:#0b1220;color:var(--muted);font-size:0.78rem;letter-spacing:0.07em;text-transform:uppercase;padding:10px 16px;border-bottom:1px solid var(--border);text-align:center;}
+  .abl-table th:first-child{text-align:left;}
+  .abl-table td{padding:12px 16px;border-bottom:1px solid rgba(51,65,85,0.5);background:var(--surface);font-size:0.88rem;text-align:center;}
+  .abl-table td:first-child{text-align:left;font-weight:700;}
+  .abl-table tr:last-child td{border-bottom:none;}
+  .abl-table tr.best td{background:#051e0f;}
+  .val-100{color:#22c55e;font-weight:900;}
+  .val-high{color:#22c55e;font-weight:700;}
+  .val-mid{color:#fbbf24;font-weight:700;}
+  .val-low{color:#ef4444;font-weight:700;}
+  .val-wip{color:#475569;font-style:italic;}
+  .abl-id{display:inline-block;background:#1e293b;color:var(--accent);font-size:0.72rem;font-weight:900;padding:2px 8px;border-radius:99px;margin-right:6px;}
+
+  /* 실패 분석 */
+  .fail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:28px;}
+  .fail-card{background:var(--surface);border-radius:12px;padding:20px;}
+  .fail-card.success-case{border-top:3px solid var(--green);}
+  .fail-card.fail-case{border-top:3px solid var(--red);}
+  .fc-label{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;}
+  .fc-label.green{color:var(--green);}
+  .fc-label.red{color:var(--red);}
+  .fc-title{font-weight:700;font-size:0.95rem;margin-bottom:6px;}
+  .fc-body{color:var(--muted);font-size:0.85rem;line-height:1.6;}
+
+  /* 일정 카드 */
+  .schedule-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;}
+  .sched-card{flex:1;min-width:180px;background:var(--surface);border-radius:10px;padding:16px;border-left:4px solid;}
+  .sched-card.today{border-color:var(--green);}
+  .sched-card.next{border-color:var(--accent);}
+  .sched-card.final{border-color:var(--yellow);}
+  .sched-date{font-weight:900;font-size:1.1rem;margin-bottom:4px;}
+  .sched-title{font-weight:700;font-size:0.88rem;margin-bottom:4px;}
+  .sched-body{color:var(--muted);font-size:0.8rem;line-height:1.5;}
+
+  /* ODE 테이블 */
+  .ode-table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:12px;overflow:hidden;margin-bottom:24px;}
+  .ode-table th{background:#0b1220;padding:10px 16px;text-align:center;color:var(--muted);font-size:0.78rem;text-transform:uppercase;}
+  .ode-table td{padding:12px 16px;border-bottom:1px solid #1e293b;text-align:center;font-size:0.9rem;}
+  .ode-table tr:last-child td{border-bottom:none;}
+
+  .callout{border-radius:10px;padding:16px 20px;margin-bottom:20px;line-height:1.7;font-size:0.9rem;}
+  .callout.info{background:#0c2340;border-left:4px solid var(--accent);color:#bae6fd;}
+  .callout.warn{background:#2d1b00;border-left:4px solid var(--yellow);color:#fde68a;}
+  .callout.success{background:#052e16;border-left:4px solid var(--green);color:#bbf7d0;}
+  .callout.critical{background:#2d0000;border-left:4px solid var(--red);color:#fca5a5;}
+
+  #pdf-btn{position:fixed;bottom:24px;right:24px;z-index:999;background:#22c55e;color:#0a0f1a;font-weight:900;font-size:0.82rem;border:none;border-radius:10px;padding:10px 20px;cursor:pointer;box-shadow:0 4px 16px rgba(34,197,94,0.4);}
+  @media print{
+    #pdf-btn{display:none!important;}
+    body{background:#fff!important;color:#111!important;}
+    :root{--bg:#fff;--surface:#f8f9fa;--text:#111;--muted:#555;}
+    .hero{background:#f1f5f9!important;}
+    .hero h1{-webkit-text-fill-color:#111!important;background:none!important;}
+    .abl-table tr.best td{background:#f0fdf4!important;}
+  }
+</style>
+</head>
+<body>
+<button id="pdf-btn" onclick="window.print()">🖨 PDF 저장</button>
+
+<!-- ══ HERO ══ -->
+<div class="hero">
+  <div class="hero-badge">MoNa-pi · 지도교수 미팅</div>
+  <h1>CH 4 — Ablation 결과 & 실기동 확정</h1>
+  <p class="subtitle">M1–M4 Ablation 결과 보고, 일반화 격차 원인 분석, Serbot2 배포 완료, 6/2 실기동 일정 확정</p>
+  <div class="meta-row">
+    <span>📅 2026년 6월 1일</span>
+    <span>📍 지도교수 연구실</span>
+    <span>👤 지도교수님 · 팀장 임현우</span>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="num" style="color:#22c55e">100%</div><div class="lbl">정형 경로 SR</div></div>
+    <div class="kpi"><div class="num" style="color:#38bdf8">73.6%</div><div class="lbl">전체 SR (M1 base)</div></div>
+    <div class="kpi"><div class="num" style="color:#fbbf24">75.5%</div><div class="lbl">최고 SR (M3/M4)</div></div>
+    <div class="kpi"><div class="num" style="color:#a78bfa">5.5GB</div><div class="lbl">Serbot2 체크포인트</div></div>
+  </div>
+</div>
+
+<!-- ══ Ablation 결과 ══ -->
+<section class="chapter" id="ch1">
+  <div class="chapter-header">
+    <span class="chapter-num">Ablation 결과</span>
+    <h2 class="chapter-title">M1–M7 실험 결과 (1차 보고)</h2>
+  </div>
+
+  <table class="abl-table">
+    <thead>
+      <tr><th>ID</th><th>설정</th><th>정형 SR</th><th>전체 SR</th><th>비고</th></tr>
+    </thead>
+    <tbody>
+      <tr class="best">
+        <td><span class="abl-id">M1</span>Base</td>
+        <td>base PaliGemma + 244ep + aug</td>
+        <td class="val-100">100%</td>
+        <td class="val-high">73.6%</td>
+        <td>기준 모델 · 가장 안정</td>
+      </tr>
+      <tr>
+        <td><span class="abl-id">M2</span>LeRobot</td>
+        <td>lerobot π0 사전학습 backbone</td>
+        <td class="val-100">100%</td>
+        <td class="val-high">73.6%</td>
+        <td>M1과 동일 — 도메인 다름</td>
+      </tr>
+      <tr>
+        <td><span class="abl-id">M3</span>LoRA</td>
+        <td>LoRA rank=16 (q/v/k/o_proj)</td>
+        <td class="val-mid">97.4%</td>
+        <td class="val-high">75.5%</td>
+        <td>전체 SR 소폭 향상</td>
+      </tr>
+      <tr>
+        <td><span class="abl-id">M4</span>Gemma</td>
+        <td>GemmaActionExpert (π0 구조)</td>
+        <td class="val-100">100%</td>
+        <td class="val-high">75.5%</td>
+        <td>전체 SR 소폭 향상</td>
+      </tr>
+      <tr>
+        <td><span class="abl-id">M5</span>No-Aug</td>
+        <td>244ep + 증강 없음</td>
+        <td class="val-wip">측정 중</td>
+        <td class="val-wip">측정 중</td>
+        <td>결과 미수신</td>
+      </tr>
+      <tr>
+        <td><span class="abl-id">M7</span>116ep</td>
+        <td>116ep + aug</td>
+        <td class="val-wip">측정 중</td>
+        <td class="val-wip">측정 중</td>
+        <td>학습 진행 중</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class="ode-table">
+    <thead><tr><th>ODE Steps (M6)</th><th>정형 SR</th><th>평균 FPE</th><th>비고</th></tr></thead>
+    <tbody>
+      <tr><td>3 steps</td><td class="val-100">100%</td><td>—</td><td>가장 빠름</td></tr>
+      <tr><td>5 steps (기본값)</td><td class="val-100">100%</td><td>—</td><td>추천</td></tr>
+      <tr><td>10 steps</td><td class="val-100">100%</td><td>—</td><td>성능 차이 없음</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout info">
+    <strong>ODE 결론:</strong> 3/5/10 steps 간 정형 경로 성능 차이 없음. 배포 기본값은 5 steps(속도-안정성 균형). Serbot2 실기동에서는 3 steps로도 충분.
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ══ 일반화 격차 분석 ══ -->
+<section class="chapter" id="ch2">
+  <div class="chapter-header">
+    <span class="chapter-num">분석</span>
+    <h2 class="chapter-title">일반화 격차 원인 분석 — 정형 100% vs 전체 73.6%</h2>
+  </div>
+
+  <div class="fail-grid">
+    <div class="fail-card success-case">
+      <div class="fc-label green">성공 케이스</div>
+      <div class="fc-title">정형 9종 경로 (Regular)</div>
+      <div class="fc-body">
+        center/left/right × straight/left/right 조합.
+        학습 데이터와 동일 분포 → SR 100%.
+        FPE 0.12–0.18m 수준, TLD 0.9–1.1 범위 안정.
+      </div>
+    </div>
+    <div class="fail-card fail-case">
+      <div class="fc-label red">실패 케이스</div>
+      <div class="fc-title">add_free 시나리오 (Non-Regular)</div>
+      <div class="fc-body">
+        대각선 경로, 극단 시작 위치, 조명 차이, 로봇 원거리.
+        SR 13% — 주요 실패 원인:
+        <strong>TLD &lt; 0.7</strong> (조기 정지).
+        목표가 아직 멀었는데도 정지 액션 출력.
+        방향은 맞으나 거리 추정 실패.
+      </div>
+    </div>
+  </div>
+
+  <div class="finding-grid">
+    <div class="finding-card warn">
+      <span class="tag fail">주요 원인</span>
+      <div class="finding-title">조기 정지 (Early Termination)</div>
+      <div class="finding-body">
+        add_free 시나리오에서 TLD &lt; 0.7 비율이 높음.
+        모델이 아직 목표에 도달하지 않았는데 <code>vx≈0, vy≈0</code> 액션 출력.
+        학습 데이터에 극단 위치 시나리오가 부족한 것이 원인.
+      </div>
+    </div>
+    <div class="finding-card info">
+      <span class="tag next">향후 개선</span>
+      <div class="finding-title">자율 정지 학습 미완</div>
+      <div class="finding-body">
+        현재 모델은 목표 도달 여부를 스스로 판단하지 않음.
+        cf_stop 학습(10% 확률)은 있으나 조건부 정지 결정 미구현.
+        데이터 보강 또는 별도 정지 판단 모듈 추가 필요.
+      </div>
+    </div>
+    <div class="finding-card good">
+      <span class="tag done">결론</span>
+      <div class="finding-title">방향성은 정확 — 거리 추정 문제</div>
+      <div class="finding-body">
+        실패 시나리오에서도 초기 이동 방향은 올바름.
+        문제는 남은 거리 추정 실패로 인한 조기 정지.
+        → 배포 1순위 모델: M1 base (가장 안정적).
+      </div>
+    </div>
+  </div>
+</section>
+<hr class="divider">
+
+<!-- ══ Serbot2 배포 & 일정 ══ -->
+<section class="chapter" id="ch3">
+  <div class="chapter-header">
+    <span class="chapter-num">배포 완료</span>
+    <h2 class="chapter-title">Serbot2 온보드 배포 완료 & 실기동 일정</h2>
+  </div>
+
+  <div class="finding-grid">
+    <div class="finding-card good">
+      <span class="tag done">배포 완료</span>
+      <div class="finding-title">추론 서버 정상 기동</div>
+      <div class="finding-body">
+        체크포인트: <code>checkpoints/best/model.safetensors</code> (5.5GB).
+        <code>bitsandbytes=0.49.2</code> INT8 양자화 적용.
+        <code>GET /health</code> 200 응답 확인.
+      </div>
+    </div>
+    <div class="finding-card info">
+      <span class="tag done">환경 구성</span>
+      <div class="finding-title">MoNa-pi-driving 브랜치 클론</div>
+      <div class="finding-body">
+        <code>~/26CS/MoNa-pi-driving/</code> (monapi-driving 브랜치).
+        24GB 스왑 파일 설정 완료.
+        soda@100.85.118.58 전송 완료.
+      </div>
+    </div>
+  </div>
+
+  <div class="schedule-row">
+    <div class="sched-card today">
+      <div class="sched-date">6/1 (오늘)</div>
+      <div class="sched-title">미팅 — Ablation 1차 결과 보고</div>
+      <div class="sched-body">M1–M4 결과 + 일반화 격차 분석 + 배포 완료 확인</div>
+    </div>
+    <div class="sched-card next">
+      <div class="sched-date">6/2 18:00–24:00</div>
+      <div class="sched-title">Serbot2 실기동 테스트</div>
+      <div class="sched-body">추론 서버 기동 → 수동 점검 → VLA 자동주행 시연. 실패 시 데이터 추가 수집 후 파인튜닝.</div>
+    </div>
+    <div class="sched-card next">
+      <div class="sched-date">6/3</div>
+      <div class="sched-title">데모 시나리오 3종 확정</div>
+      <div class="sched-body">직진, 좌/우 이동 중 발표 영상으로 활용할 시나리오 최종 선택</div>
+    </div>
+    <div class="sched-card final">
+      <div class="sched-date">6/4</div>
+      <div class="sched-title">캡스톤 경진대회 최종 발표</div>
+      <div class="sched-body">실기동 시연 + 정량 결과 발표. Ablation M5/M7 결과 최종 반영.</div>
+    </div>
+  </div>
+
+  <div class="callout success">
+    <strong>합의 사항:</strong> 배포 모델은 M1 base PaliGemma(정형 100%, 전체 73.6%)를 1순위로 사용. M5/M7 결과 취합 후 최종 비교표를 발표 자료에 반영. 실기동 실패 시나리오 발생 시 해당 데이터 30-50 에피소드 추가 수집 → 파인튜닝 방침.
+  </div>
+</section>
+
+</body>
+</html>

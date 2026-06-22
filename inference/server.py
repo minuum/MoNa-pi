@@ -216,15 +216,22 @@ async def metrics():
 
 @app.get("/model/info")
 async def model_info():
+    is_ready = _engine is not None or _mock_mode
+    ckpt_path = str(_engine.model_path) if _engine else "mock"
     return {
         "model_name":   "monapi",
-        "checkpoint":   str(_engine.model_path) if _engine else "mock",
+        "checkpoint":   ckpt_path,
         "action_dim":   _engine.action_dim if _engine else 3,
         "horizon":      _engine.horizon    if _engine else 10,
         "n_ode_steps":  _engine.n_ode_steps if _engine else 5,
         "device":       str(_engine.device) if _engine else "cpu",
-        "engine_ready": _engine is not None or _mock_mode,
+        "engine_ready": is_ready,
         "active_mode":  _active_mode,
+        # MoNaVLA 프로토콜 호환용 필드 추가
+        "model_loaded":    is_ready,
+        "checkpoint_path": ckpt_path,
+        "precision":       "fp32",
+        "config_path":     "N/A",
     }
 
 
