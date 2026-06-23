@@ -43,19 +43,27 @@ MoNaVLA에서 데이터 수집기(BGR8 디코드)와 추론 노드(BGR→RGB 변
 
 ---
 
-## 3. 검증 못함 — 적용 보류 (각자 점검 필요)
+## 3. 검증 완료 — 추가 조치 불필요
+
+| MoNaVLA 발견 | MoNa-pi 확인 결과 |
+|---|---|
+| **text attention 거의 0%** (Google-robot post-train Kosmos-2에서) | ✅ **문제 없음.** `logs/D8_attention_v2.log`(기존 실행 기록, `*.log`는 untracked)에 PaliGemma 백본 text attention 실측이 이미 있음 — forward/left/right 3방향 모두 **avg txt%=72.6~74.4%**, 전 레이어 "✓ 정상" 판정. MoNaVLA의 0%는 Google-robot post-train Kosmos-2 체크포인트 고유 손상이었고 MoNa-pi의 base PaliGemma는 그 문제가 없음. ⚠️ 단 `reports/attention_backbone_v2.json/attention_paligemma.json`에는 같은 측정의 손상된 사본(`per_layer: [], NaN`)이 같이 남아있어 혼동 주의 — **로그 파일(D8_attention_v2.log)이 진짜 결과, json은 버그난 재실행분으로 보임.** |
+
+---
+
+## 4. 검증 못함 — 적용 보류 (각자 점검 필요)
 
 | MoNaVLA 발견 | MoNa-pi에 적용 가능한가 | 비고 |
 |---|---|---|
-| **text attention 거의 0%** (Google-robot post-train Kosmos-2에서) | ❓ 미검증 | MoNa-pi는 base PaliGemma(`google/paligemma-3b-pt-224`) + 별도 flow-matching action expert로 cross-attn 조건화(`pi0_core.py forward_backbone`) — 아키텍처가 완전히 다르고, MoNaVLA의 원인은 특정 체크포인트(Google-robot)의 post-training 손상이었음. **그대로 전이 가정 불가** — 직접 attention 측정 스크립트로 따로 검증해야 함 (MoNaVLA의 `scripts/measure_attention.py` 패턴 참고 가능) |
 | **stale annotation/feature 캐시가 최신 모델과 불일치** (bbox_dataset_full.json이 5월 구 모델로 생성된 채 6월 신모델 실험에 계속 쓰인 사례) | ⚠️ 일반 원칙으로 점검 권장 | MoNa-pi도 `checkpoints/` 여러 버전(v3/v3a/메인)과 `splits.json`/`instruction_pool.json` 등 사전 계산 파일을 쓰는 구조라, **새 체크포인트/아키텍처(monapi-train AdaLN-Zero)로 바뀔 때마다 캐시 파일들이 최신 가정과 맞는지** 재확인하는 습관 필요. 자동 검증 스크립트는 만들지 않음(우리가 임의로 만들면 두 프로젝트 결합도가 너무 높아짐) — MoNa-pi 쪽에서 필요시 요청 |
 | **단일 run 헤드라인 수치가 noise-high였던 사례** (CH43, 96.85%→실제 95.39%±0.20%p) | ⚠️ 권장 사항 | DEVSTATE.md의 CL Success@0.5=45.8%, Success@T sweep 등이 전부 단일 run으로 보임. 헤드라인으로 쓰기 전 핵심 수치 1~2개만 다른 seed로 재현해보는 걸 권장 |
 | **center/straight 경로군 약점** | 🔍 흥미로운 평행 현상, 원인 불명 | MoNa-pi: `center_left 0%`, `center_right 33%`, `*_straight 25%` / MoNaVLA(MONAPI_HANDOFF 문서): `center_straight 경로 0% 병목`. 두 프로젝트가 **다른 아키텍처(이산분류 vs flow matching)인데도 같은 경로 유형에서 약함** — 데이터 부족(중앙 시작 에피소드가 절대적으로 적음, MoNaVLA 쪽도 73개 추가분 중 center_straight는 1개뿐이었음) 같은 **데이터 분포 문제일 가능성**. 모델 구조 문제가 아니라 수집 우선순위 문제일 수 있다는 가설만 제시 — 검증/조치는 각 프로젝트가 따로 진행 |
 
 ---
 
-## 4. 조치 요약
+## 5. 조치 요약
 
-- ✅ **적용**: `inference/engine.py` 리사이즈 보간 명시 (1줄, 커밋 예정)
+- ✅ **적용**: `inference/engine.py` 리사이즈 보간 명시 (`monapi-driving`, `monapi-train` 양 브랜치 모두 커밋·푸시 완료)
 - ✅ **점검 완료, 문제 없음**: BGR/RGB
-- ❓ **보류**: text attention, stale-cache 일반원칙, 5-seed 재현 습관, center/straight 약점 — 근거가 MoNa-pi 자체 코드로 직접 검증되지 않았거나 두 프로젝트 결합도를 과하게 높일 수 있어 **분석만 남기고 자동 조치하지 않음**
+- ✅ **점검 완료, 문제 없음**: text attention (기존 측정 로그로 확인, 추가 작업 불필요)
+- ❓ **보류**: stale-cache 일반원칙, 5-seed 재현 습관, center/straight 약점 — 근거가 MoNa-pi 자체 코드로 직접 검증되지 않았거나 두 프로젝트 결합도를 과하게 높일 수 있어 **분석만 남기고 자동 조치하지 않음**
