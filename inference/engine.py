@@ -178,7 +178,9 @@ class MoNaPiEngine:
         Returns:
             tensor: (1, 1, 3, IMG_SIZE, IMG_SIZE) FP16 on device
         """
-        pil = PILImage.fromarray(image).resize((self.IMG_SIZE, self.IMG_SIZE))
+        # 학습(data/dataset.py)과 동일한 BILINEAR 보간 — 미지정 시 Pillow 기본값(BICUBIC)으로
+        # 떨어져 train/inference 리사이즈 불일치 발생 (MoNaVLA에서 같은 클래스 버그 확인됨).
+        pil = PILImage.fromarray(image).resize((self.IMG_SIZE, self.IMG_SIZE), PILImage.BILINEAR)
         arr = np.array(pil).transpose(2, 0, 1).astype(np.float32) / 255.0
         t = torch.from_numpy(arr).unsqueeze(0).unsqueeze(0)  # (1, 1, 3, H, W)
         return t.to(self.device)  # backbone이 자체 dtype으로 캐스팅
