@@ -352,7 +352,23 @@
           <tr><td>M5(증강 없음)</td><td>73.6%</td><td>0.3868m</td></tr>
         </tbody>
       </table>
-      <strong>증강 유무가 약한 카테고리(center/straight 계열)에 측정 가능한 차이를 만들지 않음</strong> — 두 구성이 거의 동일. 원인은 augmentation이 아니라 해당 카테고리의 <strong>실제 학습 데이터 절대량 부족</strong>일 가능성이 높음.
+      <strong>증강 유무가 측정 가능한 차이를 만들지 않음</strong> — 두 구성이 거의 동일.
+    </div>
+  </div>
+  <div class="finding-card bad">
+    <div class="finding-title">9-2. 14건 실패 정체 추적(정정) — "center/straight 약점"이 아니라 free_* OOD 프로브 전체</div>
+    <div class="finding-body">
+      <code>episode_idx</code>를 실제 h5 파일명으로 역매핑한 결과, 처음 추정(center/straight 카테고리)과 전혀 다른 그림이었다.
+      <table>
+        <thead><tr><th>카테고리</th><th>구성</th><th>실패</th></tr></thead>
+        <tbody>
+          <tr><td>정형 9종(center/left/right×straight/left/right)</td><td>38개</td><td><strong>0개(0%)</strong></td></tr>
+          <tr><td>free_center_*(극단오프셋/대각선/원거리/조명)</td><td>5개</td><td>4개(robot_far만 성공)</td></tr>
+          <tr><td>free_left_*</td><td>5개</td><td><strong>5개(100%)</strong></td></tr>
+          <tr><td>free_right_*</td><td>5개</td><td><strong>5개(100%)</strong></td></tr>
+        </tbody>
+      </table>
+      baseline·M5(no-aug) 둘 다 동일하게 <strong>free 14/15 실패, 정형 0/38 실패</strong>. CH7의 add_free 244ep 통합(center_straight 21ep 추가)이 정형 경로 문제는 실제로 해소한 것으로 보이고, 남은 문제는 augmentation이 아니라 <strong>학습 분포 밖(OOD) 일반화 한계</strong> — free_* 부류 데이터 자체를 늘리거나 OOD 흉내 증강이 필요.
     </div>
   </div>
   <div class="finding-card info">
@@ -388,10 +404,10 @@
       <strong>text attention</strong>: 기존 측정 로그(<code>logs/D8_attention_v2.log</code>)에서 PaliGemma 백본 text attention이 forward/left/right 3방향 모두 <strong>72.6~74.4%</strong>로 정상 — MoNaVLA의 Google-robot post-train Kosmos-2 0% 붕괴와 대조적으로 MoNa-pi는 건강한 상태.
     </div>
   </div>
-  <div class="finding-card info">
-    <div class="finding-title">흥미로운 평행 현상 — center/straight 약점</div>
+  <div class="finding-card warn">
+    <div class="finding-title">평행 현상 가설 — 정정됨 (center/straight 약점 → free_* OOD 문제)</div>
     <div class="finding-body">
-      MoNa-pi: center_left 0%, center_right 33%, *_straight 25% (DEVSTATE.md, 5/28 기준) / MoNaVLA: center_straight 경로 0% 병목 — <strong>완전히 다른 아키텍처(연속 flow matching vs 이산 분류)인데도 같은 경로 유형에서 약함</strong>. CH9의 M5 결과(증강 무관)와 결합하면, 두 프로젝트 모두 데이터 절대량 문제일 가능성이 높다는 가설로 수렴.
+      DEVSTATE.md(5/28 기준) 당시엔 center_left 0%/center_right 33%/*_straight 25%였고, MoNaVLA의 center_straight 0% 병목과 평행하다는 가설을 세웠다. 그러나 <strong>CH9-2(6/23 재진단)에서 정형 9종 경로는 현재 100% 성공</strong>으로 확인됨 — CH7의 add_free 통합(center_straight 21ep 추가)이 그 문제를 실제로 해소한 것으로 보임. 현재 남은 약점은 카테고리가 아니라 <strong>free_* OOD 프로브 전체</strong>(→ CH9-2). MoNaVLA와의 평행 비교는 "약한 카테고리"가 아니라 "분포 밖 일반화" 레벨에서 다시 봐야 함.
     </div>
   </div>
   <p style="color:var(--muted);font-size:0.85rem">전체 분석: <code>docs/MONAVLA_CROSSCHECK_20260623.md</code></p>
