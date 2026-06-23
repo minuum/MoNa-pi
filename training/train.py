@@ -209,6 +209,8 @@ def train(config_path: str):
         use_color_jitter=cfg["data"].get("use_color_jitter", False),
         use_random_crop=cfg["data"].get("use_random_crop", False),
         use_counterfactual=cfg["data"].get("use_counterfactual", False),
+        use_ood_aug=cfg["data"].get("use_ood_aug", False),
+        ood_aug_p=cfg["data"].get("ood_aug_p", 0.35),
     )
     train_loader = DataLoader(
         train_ds,

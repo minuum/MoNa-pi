@@ -10,6 +10,7 @@ from PIL import Image as PILImage
 from pathlib import Path
 
 from data.preprocessing import EpisodePreprocessor, ActionNormalizer, CLIP_MEAN, CLIP_STD
+from data.ood_augment import sample_ood_params, apply_ood_aug
 
 
 # ─────────────────────────────────────────────────────
@@ -105,6 +106,8 @@ class ActionChunkDataset(Dataset):
         use_color_jitter: bool = False,
         use_random_crop: bool = False,
         use_counterfactual: bool = False,
+        use_ood_aug: bool = False,
+        ood_aug_p: float = 0.35,
         is_training: bool = True,
     ):
         self.directory = Path(directory)
@@ -117,6 +120,8 @@ class ActionChunkDataset(Dataset):
         self.image_size = image_size
         self.transform = transform
         self.augment = augment
+        self.use_ood_aug = use_ood_aug
+        self.ood_aug_p = ood_aug_p
         self.is_training = is_training
 
         # 전처리 파이프라인 초기화
@@ -183,11 +188,21 @@ class ActionChunkDataset(Dataset):
         # ── 이미지 윈도우 ─────────────────────────────────────────
         imgs_raw = images_raw[t - self.window_size + 1 : t + 1]
 
+        # OOD 흉내 증강 파라미터 — 윈도우 전체에 동일하게 적용(프레임별 독립 샘플링 X)
+        ood_params = (
+            sample_ood_params(self.ood_aug_p)
+            if (self.use_ood_aug and self.is_training)
+            else {}
+        )
+
         processed_images = []
         for img in imgs_raw:
             img_pil = PILImage.fromarray(img).resize(
                 (self.image_size, self.image_size), PILImage.BILINEAR
             )
+            # OOD 흉내 증강 — robot_close/far(zoom), basket_left/right_extreme(shift)
+            if ood_params:
+                img_pil = apply_ood_aug(img_pil, ood_params)
             # ColorJitter (MoNaVLA 계승)
             if self._color_jitter is not None:
                 img_pil = self._color_jitter(img_pil)
@@ -253,6 +268,8 @@ def build_train_val_split(
     use_color_jitter: bool = False,
     use_random_crop: bool = False,
     use_counterfactual: bool = False,
+    use_ood_aug: bool = False,
+    ood_aug_p: float = 0.35,
     seed: int = 42,
 ):
     """
@@ -273,6 +290,8 @@ def build_train_val_split(
         use_color_jitter=use_color_jitter,
         use_random_crop=use_random_crop,
         use_counterfactual=use_counterfactual,
+        use_ood_aug=use_ood_aug,
+        ood_aug_p=ood_aug_p,
         is_training=True,
     )
     val_full = ActionChunkDataset(
