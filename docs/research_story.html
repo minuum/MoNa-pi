@@ -368,7 +368,23 @@
           <tr><td>free_right_*</td><td>5개</td><td><strong>5개(100%)</strong></td></tr>
         </tbody>
       </table>
-      baseline·M5(no-aug) 둘 다 동일하게 <strong>free 14/15 실패, 정형 0/38 실패</strong>. CH7의 add_free 244ep 통합(center_straight 21ep 추가)이 정형 경로 문제는 실제로 해소한 것으로 보이고, 남은 문제는 augmentation이 아니라 <strong>학습 분포 밖(OOD) 일반화 한계</strong> — free_* 부류 데이터 자체를 늘리거나 OOD 흉내 증강이 필요.
+      baseline·M5(no-aug) 둘 다 동일하게 <strong>free 14/15 실패, 정형 0/38 실패</strong>. CH7의 add_free 244ep 통합(center_straight 21ep 추가)이 정형 경로 문제는 실제로 해소한 것으로 보이고, 남은 문제는 augmentation이 아니라 <strong>학습 분포 밖(OOD) 일반화 한계</strong>.
+    </div>
+  </div>
+  <div class="finding-card bad">
+    <div class="finding-title">9-3. M8 — OOD 흉내 증강 시도 → 완전한 null 결과</div>
+    <div class="finding-body">
+      <code>data/ood_augment.py</code> 신규 구현(robot_close/far zoom, basket_extreme 좌우 shift, 윈도우 8프레임 동일 적용)으로 재학습 후 동일 full(53) eval.
+      <table>
+        <thead><tr><th>구성</th><th>SR</th><th>FPE</th></tr></thead>
+        <tbody>
+          <tr><td>baseline</td><td>73.6%</td><td>0.3906m</td></tr>
+          <tr><td>M5(no-aug)</td><td>73.6%</td><td>0.3868m</td></tr>
+          <tr><td><strong>M8(ood-aug)</strong></td><td><strong>73.6%</strong></td><td>0.3944m</td></tr>
+        </tbody>
+      </table>
+      <strong>실패한 14개 에피소드가 baseline/M5와 정확히 1:1 동일</strong>(성공한 것도 free_center_robot_far 단 1개로 동일) — 단 1건도 안 바뀜.
+      <strong>원인 추정</strong>: 이 증강은 이미지를 변형하지만 <strong>액션 레이블은 원본 그대로</strong>라, 실제 OOD 시나리오의 image→action 대응 관계를 못 가르침 — 시각적 invariance만 학습되고 새로운 매핑은 못 배움. <strong>이미지 레벨 합성 증강으로는 이 문제를 못 풀고, 실제 free_* 데이터 추가 수집이 유일하게 남은 검증된 다음 단계.</strong>
     </div>
   </div>
   <div class="finding-card info">
