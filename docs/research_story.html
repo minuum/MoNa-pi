@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoNa-pi — 전체 연구 여정</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f1a;
+    --surface: #111827;
+    --surface2: #1e293b;
+    --border: #1e293b;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --yellow: #fbbf24;
+    --purple: #a78bfa;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family: 'Noto Sans KR', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+
+  .hero { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%); padding: 80px 40px; text-align:center; border-bottom:1px solid #1e293b; }
+  .hero h1 { font-size:3.5rem; font-weight:900; background: linear-gradient(90deg, #38bdf8, #a78bfa, #22c55e); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:16px; }
+  .hero .subtitle { color:var(--muted); font-size:1.1rem; max-width:700px; margin:0 auto 32px; }
+  .kpi-row { display:flex; gap:20px; justify-content:center; flex-wrap:wrap; margin-top:32px; }
+  .kpi { background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px 32px; text-align:center; }
+  .kpi .num { font-size:2.5rem; font-weight:900; }
+  .kpi .lbl { color:var(--muted); font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; margin-top:4px; }
+
+  .chapter { max-width:1200px; margin:0 auto; padding:60px 40px; }
+  .chapter-header { display:flex; align-items:center; gap:16px; margin-bottom:36px; }
+  .chapter-num { background:var(--accent); color:#0a0f1a; font-weight:900; font-size:0.85rem; padding:4px 12px; border-radius:20px; white-space:nowrap; }
+  .chapter-title { font-size:2rem; font-weight:800; }
+  .chapter-divider { border:none; border-top:1px solid #1e293b; margin:0; }
+  .chapter-desc { color:var(--muted); max-width:800px; margin-bottom:32px; font-size:1rem; line-height:1.8; }
+
+  .callout { border-radius:10px; padding:16px 20px; margin-bottom:20px; line-height:1.7; font-size:0.92rem; }
+  .callout.info { background:#0c2340; border-left:4px solid var(--accent); color:#bae6fd; }
+  .callout.warn { background:#2d1b00; border-left:4px solid var(--yellow); color:#fde68a; }
+  .callout.critical { background:#2d0000; border-left:4px solid var(--red); color:#fca5a5; }
+  .callout.success { background:#052e16; border-left:4px solid var(--green); color:#bbf7d0; }
+
+  .finding-card { background:var(--surface); border-radius:12px; padding:20px; border-left:4px solid; margin-bottom:20px; }
+  .finding-card.warn { border-color:var(--yellow); }
+  .finding-card.bad  { border-color:var(--red); }
+  .finding-card.good { border-color:var(--green); }
+  .finding-card.info { border-color:var(--accent); }
+  .finding-title { font-weight:700; margin-bottom:10px; font-size:1.05rem; }
+  .finding-body { color:#cbd5e1; font-size:0.92rem; line-height:1.7; }
+  .finding-body table { width:100%; border-collapse:collapse; font-size:0.85rem; margin-top:8px; }
+  .finding-body th { padding:6px; text-align:left; color:#7dd3fc; border-bottom:1px solid #334155; }
+  .finding-body td { padding:6px; border-bottom:1px solid #1e293b; }
+
+  code { background:#1e293b; padding:2px 6px; border-radius:4px; font-family:monospace; font-size:0.88em; color:#7dd3fc; }
+  a { color:#7dd3fc; }
+
+  /* ── TOC ── */
+  #toc { position:fixed; top:20%; right:0; z-index:998; display:flex; flex-direction:column; align-items:flex-end; }
+  #toc-toggle {
+    background:#1e293b; border:1px solid #334155; color:#94a3b8;
+    font-size:0.7rem; font-weight:700; padding:6px 10px; cursor:pointer;
+    border-radius:8px 0 0 8px; writing-mode:vertical-rl;
+    text-orientation:mixed; letter-spacing:0.08em; margin-bottom:4px;
+    transition:background 0.15s, color 0.15s;
+  }
+  #toc-toggle:hover { background:#334155; color:#f1f5f9; }
+  #toc-panel {
+    background:#111827; border:1px solid #1e293b; border-right:none;
+    border-radius:12px 0 0 12px; padding:12px 0; min-width:220px;
+    max-height:80vh; overflow-y:auto; display:none;
+    box-shadow:-4px 0 24px rgba(0,0,0,0.5);
+  }
+  #toc-panel.open { display:block; }
+  #toc-panel::-webkit-scrollbar { width:4px; }
+  #toc-panel::-webkit-scrollbar-thumb { background:#334155; border-radius:2px; }
+  .toc-item {
+    display:flex; align-items:center; gap:8px; padding:7px 16px;
+    cursor:pointer; text-decoration:none; color:#94a3b8;
+    font-size:0.78rem; line-height:1.3; transition:background 0.1s, color 0.1s;
+    border-left:2px solid transparent;
+  }
+  .toc-item:hover { background:#1e293b; color:#e2e8f0; }
+  .toc-item.active { color:#38bdf8; border-left-color:#38bdf8; background:rgba(56,189,248,0.07); }
+  .toc-badge {
+    flex-shrink:0; font-size:0.65rem; font-weight:900; padding:2px 6px;
+    border-radius:99px; background:#1e293b; color:#64748b; white-space:nowrap;
+  }
+  .toc-item.active .toc-badge { background:rgba(56,189,248,0.15); color:#38bdf8; }
+  .toc-label { flex:1; }
+  .toc-cat { flex-shrink:0; font-size:0.6rem; font-weight:700; padding:1px 5px; border-radius:4px; margin-left:4px; white-space:nowrap; }
+  .toc-cat.cat-exp { background:rgba(56,189,248,0.15); color:#38bdf8; }
+  .toc-cat.cat-fix { background:rgba(248,113,113,0.15); color:#f87171; }
+  .toc-cat.cat-diag { background:rgba(251,191,36,0.15); color:#fbbf24; }
+  .toc-cat.cat-cmp { background:rgba(167,139,250,0.15); color:#a78bfa; }
+
+  #pdf-btn {
+    position:fixed; bottom:20px; right:20px; z-index:998;
+    background:#1e293b; border:1px solid #334155; color:#94a3b8;
+    padding:10px 16px; border-radius:8px; cursor:pointer; font-size:0.8rem;
+  }
+  @media print { #toc, #pdf-btn { display:none !important; } }
+</style>
+</head>
+<body>
+<button id="pdf-btn" onclick="window.print()">🖨 PDF 저장</button>
+
+<nav id="toc">
+  <button id="toc-toggle" onclick="document.getElementById('toc-panel').classList.toggle('open')">목차</button>
+  <div id="toc-panel">
+    <a class="toc-item" href="#ch1" data-target="ch1"><span class="toc-badge">CH 1</span><span class="toc-label">초기 설계 — π0를 모바일로</span></a>
+    <a class="toc-item" href="#ch2" data-target="ch2"><span class="toc-badge">CH 2</span><span class="toc-label">End-to-End 파이프라인</span></a>
+    <a class="toc-item" href="#ch3" data-target="ch3"><span class="toc-badge">CH 3</span><span class="toc-label">PaliGemma + Action Expert 전환</span></a>
+    <a class="toc-item" href="#ch4" data-target="ch4"><span class="toc-badge">CH 4</span><span class="toc-label">AdaLN-Zero — 진짜 π0 modulation</span><span class="toc-cat cat-exp">실험</span></a>
+    <a class="toc-item" href="#ch5" data-target="ch5"><span class="toc-badge" style="background:rgba(248,113,113,0.15);color:#f87171">CH 5</span><span class="toc-label">BF16/dtype 버그수정 시리즈</span><span class="toc-cat cat-fix">정정</span></a>
+    <a class="toc-item" href="#ch6" data-target="ch6"><span class="toc-badge">CH 6</span><span class="toc-label">INT8 양자화 — 온보드 추론</span></a>
+    <a class="toc-item" href="#ch7" data-target="ch7"><span class="toc-badge" style="background:rgba(34,197,94,0.15);color:#22c55e">CH 7</span><span class="toc-label">add_free 244ep 통합</span><span class="toc-cat cat-exp">실험</span></a>
+    <a class="toc-item" href="#ch8" data-target="ch8"><span class="toc-badge" style="background:rgba(34,197,94,0.15);color:#22c55e">CH 8</span><span class="toc-label">Gemma Expert·LoRA·lerobot 최종실험</span><span class="toc-cat cat-cmp">비교</span></a>
+    <a class="toc-item" href="#ch9" data-target="ch9"><span class="toc-badge" style="background:rgba(56,189,248,0.15);color:#38bdf8">CH 9</span><span class="toc-label">6/23 Ablation — ODE/증강/데이터량</span><span class="toc-cat cat-exp">실험</span></a>
+    <a class="toc-item" href="#ch10" data-target="ch10"><span class="toc-badge" style="background:rgba(167,139,250,0.15);color:#a78bfa">CH 10</span><span class="toc-label">MoNaVLA 연동 분석</span><span class="toc-cat cat-cmp">비교</span></a>
+    <a class="toc-item" href="https://minuum.github.io/MoNaVLA/" style="margin-top:8px;border-top:1px solid rgba(245,158,11,0.2);padding-top:10px"><span class="toc-badge" style="background:rgba(245,158,11,0.25);color:#f59e0b;font-weight:900">↗</span><span class="toc-label">MoNaVLA 연구 히스토리 (자매 프로젝트)</span></a>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>MoNa-π — 전체 연구 여정</h1>
+  <p class="subtitle">SigLIP + PaliGemma + Flow Matching 기반 연속 제어 모바일 VLA — 초기 설계부터 오늘 ablation까지</p>
+  <div class="kpi-row">
+    <div class="kpi"><div class="num" style="color:#60a5fa">244</div><div class="lbl">H5 에피소드</div></div>
+    <div class="kpi"><div class="num" style="color:#4ade80">100%</div><div class="lbl">CL SR (regular 9-path)</div></div>
+    <div class="kpi"><div class="num" style="color:#fbbf24">75.5%</div><div class="lbl">CL SR (full, 최고=Gemma Expert)</div></div>
+    <div class="kpi"><div class="num" style="color:#a78bfa">0.0414</div><div class="lbl">best val_loss</div></div>
+  </div>
+</div>
+
+<div class="chapter" id="ch1">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 1</span>
+    <h2 class="chapter-title">초기 설계 — π0를 모바일 로봇으로</h2>
+  </div>
+  <p class="chapter-desc">
+    2026-03-17, "MoNa-pi"(Mobile Navigation Pi-zero)로 명명. Physical Intelligence의 π0 아키텍처를 3-DOF 옴니휠 홀로노믹 모바일 로봇에 이식하는 것이 핵심 목표.
+    MoNaVLA(이산 분류 기반)의 한계를 출발점으로 명시했다.
+  </p>
+  <div class="callout warn">
+    <strong>MoNaVLA의 한계로 진단된 3가지</strong> (설계안 원문)<br>
+    1. <strong>데이터 암기(Timing Memorization)</strong> — offline PM 100%인데 실주행에서 시각 정보보다 "진행 시간(step)"을 암기해 행동하는 경향<br>
+    2. <strong>제어 빈도(2~5Hz)</strong> — VLM 연산량 때문에 반응이 느리고 Bang-bang 제어로 움직임이 부자연스러움<br>
+    3. <strong>이산적 행동 공간(8~9-class)</strong> — 매끄러운 곡선 주행·미세조정 불가능
+  </div>
+  <div class="finding-card info">
+    <div class="finding-title">설계 목표 3가지</div>
+    <div class="finding-body">
+      1. <strong>Flow Matching (연속 제어)</strong> — 이산 분류 대신 연속 속도 벡터 (v_x, v_y, ω_z) 생성<br>
+      2. <strong>Action Chunking (50Hz+)</strong> — 한 번의 추론으로 미래 N스텝(10~50) 액션을 한꺼번에 예측<br>
+      3. <strong>Causal Visual Understanding</strong> — 시각적 변조 데이터로 타이밍 암기 방지
+    </div>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">근거: <code>docs/MoNa-AI_Project_Proposal.md</code>, <code>docs/MoNa-pi_Design_Proposal_v1.md</code>, <code>docs/domain_analysis_pi0_vs_mona.md</code></p>
+</div>
+<hr class="chapter-divider">
+
+<div class="chapter" id="ch2">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 2</span>
+    <h2 class="chapter-title">End-to-End 파이프라인 구현</h2>
+  </div>
+  <p class="chapter-desc">
+    2026-04-15, 첫 전체 파이프라인 구현(<code>shosae</code> 커밋). 데이터 전처리부터 학습 config까지 한 번에 갖춰졌고, 같은 날 GitHub Pages 첫 배포도 진행됐다.
+  </p>
+  <div class="finding-card good">
+    <div class="finding-title">data/preprocessing.py·dataset.py — MoNaVLA 패턴 계승 + 신규</div>
+    <div class="finding-body">
+      <strong>ActionSmoother</strong> (Savitzky-Golay 필터) — 키보드 수집의 bang-bang 스파이크 제거<br>
+      <strong>IntentPrefixInjector</strong> — 9-class + 한/영 다국어 + 20% 노이즈 instruction<br>
+      <strong>CounterfactualInjector</strong> — stop/steer 오버라이드 (MoNaVLA 계승)<br>
+      <strong>HFlip 증강</strong> — angular_z 부호 반전 + instruction 좌/우 교체 동시 처리<br>
+      v5/v6 HDF5 포맷 자동 감지, CLIP 정규화 상수 적용
+    </div>
+  </div>
+</div>
+<hr class="chapter-divider">
+
+<div class="chapter" id="ch3">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 3</span>
+    <h2 class="chapter-title">PaliGemma + Action Expert 전환 — "진짜 π0"</h2>
+  </div>
+  <p class="chapter-desc">
+    같은 날(2026-04-15) 저녁, 백본을 PaliGemma + Action Expert로 전면 교체. 임시 구조에서 π0 원논문에 가까운 구조로 갈아탄 분기점.
+  </p>
+  <div class="finding-card info">
+    <div class="finding-title">PaliGemmaBackbone 구조</div>
+    <div class="finding-body">
+      SigLIP → Linear projector(1152→2048) → Gemma encoder. <strong>PerceiverResampler 완전 제거</strong>(PaliGemma 자체 방식 채택).<br>
+      <code>load_pretrained_paligemma=False</code>: 로컬 SigLIP+Gemma 캐시 사용 / <code>True</code>: <code>google/paligemma-3b-pt-224</code> 다운로드.<br>
+      출력: (B, T_vis+L, 2048) — VLM 전체 토큰 시퀀스를 Action Expert에 cross-attention 조건으로 전달.
+    </div>
+  </div>
+  <div class="callout info">
+    이 시점부터 약 6주간(4/15~5/27) 공백 — 다른 서버에서 아키텍처 작업이 이어진 기간으로 추정(<code>monapi-train</code> 분기 운영 체계 확립).
+  </div>
+</div>
+<hr class="chapter-divider">
+
+<div class="chapter" id="ch4">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 4</span>
+    <h2 class="chapter-title">AdaLN-Zero — 진짜 π0 modulation</h2>
+  </div>
+  <p class="chapter-desc">
+    2026-05-27, Flow Head를 π0 원논문의 AdaLN-Zero 방식으로 전면 재작성. 13개 파일, +501/-113줄 변경.
+  </p>
+  <div class="finding-card good">
+    <div class="finding-title">Before → After</div>
+    <div class="finding-body">
+      <strong>이전(단순 덧셈):</strong> <code>h = action_proj(x_t) + t_emb</code> — 시간 임베딩을 그냥 더함, self-attn은 query만 norm<br>
+      <strong>이후(AdaLN-Zero):</strong><br>
+      <code>(α1,β1,γ1,α2,β2,γ2) = AdaLNModulation(cond_emb)</code><br>
+      <code>h = h + γ1 * self_attn(norm1(h)*(1+α1)+β1)</code><br>
+      <code>h = h + cross_attn(norm2(h), vlm_cond)</code><br>
+      <code>h = h + γ2 * mlp(norm3(h)*(1+α2)+β2)</code><br>
+      Zero-init로 학습 초기 모든 modulation이 identity → 안정적 수렴 시작.
+    </div>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">신규 모듈: <code>models/heads/mona_action_expert.py</code> (정규화 래퍼), <code>scripts/verify_mona_expert.py</code> (수치 정합성 검증).</p>
+</div>
+<hr class="chapter-divider">
+
+<div class="chapter" id="ch5">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 5</span>
+    <h2 class="chapter-title">BF16/dtype 버그수정 시리즈</h2>
+  </div>
+  <p class="chapter-desc">
+    2026-05-28 하루 동안, AdaLN-Zero 전환 이후 드러난 dtype/API 불일치를 연속으로 수정. transformers 버전업과 BF16 전환이 맞물린 전형적인 인프라 정리 구간.
+  </p>
+  <div class="finding-card bad">
+    <div class="finding-title">수정된 버그 목록</div>
+    <div class="finding-body">
+      1. <strong>FP16 → BF16</strong> — PaliGemma 백본에서 FP16 사용 시 NaN loss 발생, BF16으로 해결<br>
+      2. <strong>dtype 통일</strong> — Pi0VLA와 PaliGemmaBackbone 간 dtype 불일치 제거<br>
+      3. <code>pg.model.vision_tower</code> — transformers 5.x에서 PaliGemma attribute 경로가 바뀐 것 대응<br>
+      4. <strong>language_model 정규화</strong> — 두 로드 경로(bin/safetensors) 모두 내부 GemmaModel로 통일
+    </div>
+  </div>
+  <div class="callout success">
+    같은 날 INT8 양자화, 평가 스크립트 재작성, 카메라/ROS2 노드 추가, Serbot2 INT8 추론까지 한 번에 진행 — 실로봇 배포를 향한 집중 작업일.
+  </div>
+</div>
+<hr class="chapter-divider">
+
+<div class="chapter" id="ch6">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 6</span>
+    <h2 class="chapter-title">INT8 양자화 — 온보드 추론</h2>
+  </div>
+  <p class="chapter-desc">
+    Serbot2(로봇 온보드) 메모리 제약 때문에 PaliGemma 3B를 BF16(~6GB)에서 INT8(~3GB)로 양자화. MoNaVLA의 monavla-driving 접근법을 그대로 참고.
+  </p>
+  <div class="finding-card info">
+    <div class="finding-title">구현</div>
+    <div class="finding-body">
+      BitsAndBytes <code>BitsAndBytesConfig</code> 적용, 로드 후 explicit <code>gc.collect()</code> 추가.<br>
+      Serbot2 온보드에서 INT8 추론을 안정적으로 돌리려면 <strong>8GB 스왑 파일이 필수</strong>(<code>DEPLOY.md</code> 1절).
+    </div>
+  </div>
+</div>
+<hr class="chapter-divider">
+
+<div class="chapter" id="ch7">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 7</span>
+    <h2 class="chapter-title">add_free 244ep 통합 — MoNaVLA 병목을 직접 해소</h2>
+  </div>
+  <p class="chapter-desc">
+    2026-06-01, V5(150ep) + add_free(221ep)를 병합해 244개 고유 에피소드로 from-scratch 재학습. 이 커밋이 특히 중요한 이유는 <strong>MoNaVLA에서 보고된 "center_straight 0% 병목"을 직접 타겟으로 해소</strong>하려 한 흔적이 커밋 메시지에 명시돼 있다는 점이다.
+  </p>
+  <div class="finding-card good">
+    <div class="finding-title">변경 사항</div>
+    <div class="finding-body">
+      <code>mobile_vla_dataset_merged</code> = v5(150) + add_free(221) = 244 unique ep<br>
+      <strong>center_straight: 21 episodes</strong> — 커밋 메시지: "MoNaVLA 병목 해소"<br>
+      lr: 5e-5 → 1e-4, epochs: 20 → 30, <code>pretrain.ckpt_path: ""</code> (처음부터 재학습 — 266 샘플에 70-epoch 학습으로 과적합되는 것을 방지)
+    </div>
+  </div>
+  <div class="callout info">
+    이 시점에 두 프로젝트가 데이터 레벨에서 이미 한 번 교차했다 — <a href="https://minuum.github.io/MoNaVLA/">MoNaVLA</a>의 진단(center_straight 병목)이 MoNa-pi의 데이터 수집 우선순위에 반영된 사례.
+  </div>
+</div>
+<hr class="chapter-divider">
+
+<div class="chapter" id="ch8">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 8</span>
+    <h2 class="chapter-title">Gemma Expert · LoRA · lerobot 백본 — 최종 비교실험</h2>
+  </div>
+  <p class="chapter-desc">
+    2026-06-01~02, 4가지 변형(base PaliGemma / lerobot 사전학습 백본 / Gemma Action Expert / LoRA)을 동일 조건(val 38 regular / 53 full)으로 비교. 이 시점까지의 아키텍처 탐색을 마무리하는 종합 실험.
+  </p>
+  <div class="finding-card good">
+    <div class="finding-title">closed-loop 비교 (FPE&lt;0.3m 기준)</div>
+    <div class="finding-body">
+      <table>
+        <thead><tr><th>구성</th><th>regular(38)</th><th>full(53)</th><th>FPE</th></tr></thead>
+        <tbody>
+          <tr><td>base PaliGemma</td><td>100%</td><td>73.6%</td><td>0.386m</td></tr>
+          <tr><td>lerobot 사전학습 백본</td><td>100%</td><td>73.6%</td><td>0.391m</td></tr>
+          <tr style="background:#021c0c"><td><strong>Gemma Action Expert</strong></td><td>100%</td><td><strong>75.5%</strong></td><td>0.394m ← 전체 최고</td></tr>
+          <tr><td>LoRA</td><td>97.4%</td><td>75.5%</td><td>0.373m</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="finding-card warn">
+    <div class="finding-title">핵심 발견</div>
+    <div class="finding-body">
+      1. <strong>regular 9-path는 전부 100%</strong> — 쉬운 경로는 어떤 백본을 써도 차이가 안 남<br>
+      2. <strong>free/irregular 시나리오가 진짜 병목</strong>(13% 수준 — full 53에 포함된 어려운 케이스)<br>
+      3. <strong>lerobot의 매니퓰레이션 사전학습은 모바일 내비게이션에 이득이 없음</strong> — base와 거의 동일<br>
+      4. <strong>"백본 선택"보다 "action expert 품질"이 더 큰 factor</strong> — Gemma Expert가 백본 교체 없이도 가장 큰 개선
+    </div>
+  </div>
+</div>
+<hr class="chapter-divider">
+
+<div class="chapter" id="ch9">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 9</span>
+    <h2 class="chapter-title">6/23 Ablation — ODE steps · 증강 효과 · 데이터량</h2>
+  </div>
+  <p class="chapter-desc">
+    2026-06-23, 6/2에 작성됐지만 한 번도 실행되지 않았던 <code>scripts/run_ablation.sh</code>(M6→M5→M7)를 처음 실행. 중간에 브랜치 전환 실수로 M5 eval이 한 번 끊겼다가(<code>eval_closedloop.py</code>가 <code>monapi-driving</code>엔 없는 파일이라 working tree에서 사라짐) <code>monapi-train</code>에 고정한 채 재실행해 완료했다.
+  </p>
+  <div class="finding-card good">
+    <div class="finding-title">M6 — ODE steps 3/5/10 (재학습 없음)</div>
+    <div class="finding-body">
+      3/5/10 전부 100% SR, FPE 0.0697~0.0707m로 거의 동일 → <strong>ODE steps를 3으로 줄여도 품질 손해 없음</strong>, 추론 속도 단축 여지 확보.
+    </div>
+  </div>
+  <div class="finding-card warn">
+    <div class="finding-title">M5 — 증강 없이 244ep 재학습 vs baseline</div>
+    <div class="finding-body">
+      <table>
+        <thead><tr><th>구성</th><th>full(53)</th><th>FPE</th></tr></thead>
+        <tbody>
+          <tr><td>baseline(증강 있음)</td><td>73.6%</td><td>0.3906m</td></tr>
+          <tr><td>M5(증강 없음)</td><td>73.6%</td><td>0.3868m</td></tr>
+        </tbody>
+      </table>
+      <strong>증강 유무가 약한 카테고리(center/straight 계열)에 측정 가능한 차이를 만들지 않음</strong> — 두 구성이 거의 동일. 원인은 augmentation이 아니라 해당 카테고리의 <strong>실제 학습 데이터 절대량 부족</strong>일 가능성이 높음.
+    </div>
+  </div>
+  <div class="finding-card info">
+    <div class="finding-title">M7 — 116ep 원본 v5만 재학습</div>
+    <div class="finding-body">
+      regular(24)=full(24)=100% — 그러나 이 데이터셋 자체에 hard 카테고리 평가 에피소드가 거의 없어서, "작은 데이터셋이 더 낫다"는 결론으로 이어질 수 없음. M5(n=53)와 직접 비교는 <strong>apples-to-apples가 아님</strong> — 후속 작업으로 남김.
+    </div>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">전체 결과: <code>docs/ABLATION_RESULTS_20260623.md</code></p>
+</div>
+<hr class="chapter-divider">
+
+<div class="chapter" id="ch10">
+  <div class="chapter-header">
+    <span class="chapter-num">CHAPTER 10</span>
+    <h2 class="chapter-title">MoNaVLA 연동 분석 — 같은 클래스 버그, 다른 운명</h2>
+  </div>
+  <p class="chapter-desc">
+    같은 날, <a href="https://minuum.github.io/MoNaVLA/">MoNaVLA</a> 세션에서 발견한 파이프라인 교훈들을 MoNa-pi 코드에 직접 대조 검증. 가정으로 옮기지 않고 실제 코드를 읽어 검증된 것만 적용했다.
+  </p>
+  <div class="finding-card bad">
+    <div class="finding-title">적용함 — train/inference 리사이즈 보간 불일치</div>
+    <div class="finding-body">
+      학습(<code>data/dataset.py</code>): <code>resize(..., PILImage.BILINEAR)</code> 명시<br>
+      추론(<code>inference/engine.py</code>): <code>resize(...)</code> 보간법 미지정 → Pillow 기본값(BICUBIC)<br>
+      → <code>monapi-driving</code>·<code>monapi-train</code> 양 브랜치 모두 BILINEAR로 통일, 커밋·푸시 완료.
+    </div>
+  </div>
+  <div class="finding-card good">
+    <div class="finding-title">점검 완료, 문제 없음 — BGR/RGB · text attention</div>
+    <div class="finding-body">
+      <strong>BGR/RGB</strong>: <code>camera_node.py</code>→<code>collector</code>→<code>controller</code> 전체 경로가 일관되게 RGB(<code>rgb8</code>)로 통일돼 있음.<br>
+      <strong>text attention</strong>: 기존 측정 로그(<code>logs/D8_attention_v2.log</code>)에서 PaliGemma 백본 text attention이 forward/left/right 3방향 모두 <strong>72.6~74.4%</strong>로 정상 — MoNaVLA의 Google-robot post-train Kosmos-2 0% 붕괴와 대조적으로 MoNa-pi는 건강한 상태.
+    </div>
+  </div>
+  <div class="finding-card info">
+    <div class="finding-title">흥미로운 평행 현상 — center/straight 약점</div>
+    <div class="finding-body">
+      MoNa-pi: center_left 0%, center_right 33%, *_straight 25% (DEVSTATE.md, 5/28 기준) / MoNaVLA: center_straight 경로 0% 병목 — <strong>완전히 다른 아키텍처(연속 flow matching vs 이산 분류)인데도 같은 경로 유형에서 약함</strong>. CH9의 M5 결과(증강 무관)와 결합하면, 두 프로젝트 모두 데이터 절대량 문제일 가능성이 높다는 가설로 수렴.
+    </div>
+  </div>
+  <p style="color:var(--muted);font-size:0.85rem">전체 분석: <code>docs/MONAVLA_CROSSCHECK_20260623.md</code></p>
+</div>
+
+<script>
+(function() {
+  const SECTIONS = ['ch1','ch2','ch3','ch4','ch5','ch6','ch7','ch8','ch9','ch10'];
+  const items = document.querySelectorAll('.toc-item[data-target]');
+  function getActive() {
+    const mid = window.scrollY + window.innerHeight * 0.35;
+    let active = SECTIONS[0];
+    for (const id of SECTIONS) {
+      const el = document.getElementById(id);
+      if (el && el.getBoundingClientRect().top + window.scrollY <= mid) active = id;
+    }
+    return active;
+  }
+  function update() {
+    const active = getActive();
+    items.forEach(item => item.classList.toggle('active', item.dataset.target === active));
+  }
+  window.addEventListener('scroll', update, {passive: true});
+  update();
+  items.forEach(item => {
+    item.addEventListener('click', () => {
+      setTimeout(() => document.getElementById('toc-panel').classList.remove('open'), 150);
+    });
+  });
+})();
+</script>
+</body>
+</html>
