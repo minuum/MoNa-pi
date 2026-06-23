@@ -174,7 +174,7 @@ def main():
     parser.add_argument("--port",   type=int, default=8080)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--solver", default="heun", choices=["euler", "heun", "dpm"])
-    parser.add_argument("--steps",  type=int, default=5, help="ODE 스텝 수")
+    parser.add_argument("--steps",  type=int, default=3, help="ODE 스텝 수 — M6 ablation(6/23): 3/5/10 품질 동일")
     parser.add_argument("--mock",   action="store_true",
                         help="모델 로드 없이 0 액션 반환 (통합 테스트용)")
     args = parser.parse_args()

@@ -8,7 +8,7 @@ MoNa-pi 추론 엔진
     - 전처리(정규화) + 후처리(역정규화) 내장
 
 사용:
-    engine = MoNaPiEngine("checkpoints/best", device="cuda", solver="heun", n_ode_steps=5)
+    engine = MoNaPiEngine("checkpoints/best", device="cuda", solver="heun", n_ode_steps=3)
     engine.warmup()
     actions = engine.predict(image_np, instruction="장애물 회피")
     # actions: np.ndarray (10, 3)  [vx, vy, wz] in m/s
@@ -59,7 +59,7 @@ class MoNaPiEngine:
         model_path: str,
         device: str = "cuda",
         solver: str = "heun",
-        n_ode_steps: int = 5,
+        n_ode_steps: int = 3,  # M6 ablation(6/23): 3/5/10 품질 동일 — 기본값을 3으로 낮춰 속도 확보
         action_dim: int = 3,
         horizon: int = 10,
         hidden_dim: int = 512,
