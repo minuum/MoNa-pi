@@ -223,7 +223,7 @@ async def model_info():
         "checkpoint":   ckpt_path,
         "action_dim":   _engine.action_dim if _engine else 3,
         "horizon":      _engine.horizon    if _engine else 10,
-        "n_ode_steps":  _engine.n_ode_steps if _engine else 5,
+        "n_ode_steps":  _engine.n_ode_steps if _engine else 3,
         "device":       str(_engine.device) if _engine else "cpu",
         "engine_ready": is_ready,
         "active_mode":  _active_mode,
@@ -377,7 +377,7 @@ def main():
     parser.add_argument("--port",   type=int, default=8082)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--solver", default="heun", choices=["euler", "heun", "dpm"])
-    parser.add_argument("--steps",  type=int, default=5)
+    parser.add_argument("--steps",  type=int, default=3)  # M6 ablation(6/23): 3/5/10 품질 동일
     parser.add_argument("--mock",   action="store_true")
     args = parser.parse_args()
 

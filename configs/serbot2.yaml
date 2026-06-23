@@ -23,4 +23,4 @@ robot:
   cmd_vel_topic: /cmd_vel
   control_hz: 10             # 10Hz 제어 루프
   replan_ratio: 0.5          # 50% 소진 시 재계획
-  n_ode_steps: 5             # Heun ODE 스텝 수 (속도-정확도 트레이드오프)
+  n_ode_steps: 3             # Heun ODE 스텝 수 — M6 ablation(6/23)에서 3/5/10 품질 동일 확인, 3으로 속도 확보
