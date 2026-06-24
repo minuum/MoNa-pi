@@ -31,10 +31,18 @@ class Pi0VLA(nn.Module):
         vision_model_id: str = "google/siglip-so400m-patch14-384",
         lang_model_id: str = "google/gemma-2b",
         paligemma_id: str = "google/paligemma-3b-pt-224",
+        use_bbox_cond: bool = False,
+        bbox_only: bool = False,
+        bbox_dim: int = 4,
         **kwargs,
     ):
         super().__init__()
         self.use_paligemma = use_paligemma
+        # Phase 3 — gray basket bbox(cx,cy,area,valid) grounding 신호 ablation.
+        # bbox_only=True면 VLM cond를 아예 안 쓰고 bbox 토큰만 cross-attn에 전달
+        # (MoNaVLA ablate_bbox_image_features.py와 동일 철학의 3-way 비교용).
+        self.use_bbox_cond = use_bbox_cond or bbox_only
+        self.bbox_only = bbox_only
 
         # ── 1. Backbone ───────────────────────────────────────────────
         if use_paligemma:
@@ -59,6 +67,9 @@ class Pi0VLA(nn.Module):
 
         cond_dim = self.backbone.lang_hidden_size  # 2048
 
+        if self.use_bbox_cond:
+            self.bbox_proj = nn.Linear(bbox_dim, cond_dim)
+
         # ── 2. MoNa-pi Action Expert (SOTA-ready) ────────────────────
         from .heads.mona_action_expert import MoNaActionExpert
         self.action_expert = MoNaActionExpert(
@@ -79,33 +90,45 @@ class Pi0VLA(nn.Module):
             self.action_expert.bfloat16()
 
     # ─────────────────────────────────────────────────────────────────
-    def forward_backbone(self, images: torch.Tensor, instructions) -> torch.Tensor:
+    def forward_backbone(self, images: torch.Tensor, instructions, bbox: torch.Tensor = None) -> torch.Tensor:
         """
         Args:
             images:       (B, N, C, H, W)
             instructions: List[str] 길이 B
+            bbox:         (B, window_size, bbox_dim) gray basket grounding 신호 (Phase 3, 선택)
         Returns:
             cond: (B, T_vlm, 2048)
                 use_paligemma=True:  T_vlm = T_vis + L  (전체 VLM 시퀀스)
                 use_paligemma=False: T_vlm = 64         (PerceiverResampler latent)
+                use_bbox_cond=True:  T_vlm += window_size (bbox 토큰 concat)
+                bbox_only=True:      T_vlm = window_size  (VLM cond 자체를 안 씀)
         """
-        return self.backbone(images, instructions)
+        if self.bbox_only:
+            assert bbox is not None, "bbox_only=True인데 bbox가 전달되지 않음"
+            return self.bbox_proj(bbox.to(next(self.parameters()).dtype))
+
+        cond = self.backbone(images, instructions)
+        if self.use_bbox_cond and bbox is not None:
+            bbox_tok = self.bbox_proj(bbox.to(cond.dtype))
+            cond = torch.cat([cond, bbox_tok], dim=1)
+        return cond
 
     def compute_loss(
         self,
         images: torch.Tensor,
         instructions,
         actions_gt: torch.Tensor,
+        bbox: torch.Tensor = None,
     ) -> torch.Tensor:
         """
-        MoNa-pi Flow Matching 학습 손실. 
+        MoNa-pi Flow Matching 학습 손실.
         MoNaActionExpert 내부에서 actions_gt 정규화 후 Loss 계산.
         """
         model_dtype = next(self.parameters()).dtype
         images     = images.to(dtype=model_dtype)
         actions_gt = actions_gt.to(dtype=model_dtype)
 
-        cond = self.forward_backbone(images, instructions)
+        cond = self.forward_backbone(images, instructions, bbox=bbox)
         return self.action_expert.get_loss(actions_gt, cond)
 
     @torch.no_grad()
@@ -114,6 +137,7 @@ class Pi0VLA(nn.Module):
         images: torch.Tensor,
         instructions,
         n_steps: int = 5,
+        bbox: torch.Tensor = None,
     ) -> torch.Tensor:
         """
         Heun's method ODE solver로 액션 청크 샘플링 및 역정규화.
@@ -126,7 +150,7 @@ class Pi0VLA(nn.Module):
         device = images.device
         dtype  = model_dtype
 
-        cond = self.forward_backbone(images, instructions)
+        cond = self.forward_backbone(images, instructions, bbox=bbox)
         B    = cond.shape[0]
 
         # 초기 노이즈 (정규화된 공간)

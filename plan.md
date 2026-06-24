@@ -46,13 +46,30 @@ M7/M8이 보여준 것: "더 많은 같은 데이터"와 "가짜 변형"은 안 
 
 MoNaVLA의 핵심 교훈: end-to-end VLM은 PM이 높아도 closed-loop에서 방향 오류가 누적되지만, bbox 같은 명시적 grounding을 분리해서 주면 closed-loop이 극적으로 좋아짐. MoNa-pi는 현재 순수 end-to-end(이미지 패치 → PaliGemma → action expert)라 같은 함정에 빠질 위험이 있다.
 
-- 가설: `free_*` 실패가 "바구니/목표를 못 찾는" grounding 문제라면, bbox 또는 목표 중심 좌표를 보조 컨디셔닝으로 주입하면 개선될 것.
-- 실험 설계(스케치, 구현 전 검토 필요):
-  - SigLIP/PaliGemma의 attention map 또는 별도 경량 detector로 목표 바구니의 (cx, cy, area) 추출.
-  - `Pi0VLA.forward_backbone()` 출력에 이 3~4차원 벡터를 concat하거나, action expert의 cross-attn cond에 추가 토큰으로 주입.
-  - MoNaVLA에서 이미 검증된 ablation 패턴(`scripts/ablate_bbox_image_features.py`) 참고해 bbox_only / image_only / bbox+image 세 조건 비교.
-- 이 Phase는 Phase 1(측정 인프라)이 끝나야 의미 있는 비교가 가능. Phase 2(데이터)와는 병행 가능.
-- 리스크: MoNaVLA 쪽도 "BBox는 보조, image가 핵심"이라는 결론이었음(bbox_only 67.4% vs image_only 75.6%) — grounding 신호가 만능 해법은 아닐 수 있음. 작은 규모 파일럿으로 먼저 검증.
+가설: `free_*` 실패가 "바구니/목표를 못 찾는" grounding 문제라면, bbox 또는 목표 중심 좌표를 보조 컨디셔닝으로 주입하면 개선될 것.
+
+**리서치로 확인된 출발선**: MoNaVLA와 달리 MoNa-pi는 bbox 라벨이 전혀 없다(`mobile_vla_dataset_merged/`의 H5엔 `actions`/`language_instruction`/`observations/images`뿐). `language_instruction`은 거의 전부 "Navigate ... gray basket ..." 형태로 **타겟 객체가 "gray basket"으로 고정**돼 있음을 확인 — 고정 프롬프트로 detect 가능.
+
+**Detector 방식 결정(2026-06-24, 사용자 승인)**: PaliGemma 자체 `generate()` detect 기능 사용. 이미 로드해둔 `paligemma-3b-pt-224`에 `"detect gray basket"` 프롬프트로 `generate()` 호출 → `<locXXXX>` 토큰 파싱 → (cx, cy, area) 정규화 좌표. 추가 모델/의존성 불필요. 오프라인 1회성 캐시 생성이라 inference 핫루프에는 안 들어감(MoNaVLA가 경고한 "실시간 generate() 금지"는 다른 backbone·다른 상황이라 여기 적용 안 됨). **단, 박스 정확도가 별도 fine-tune 없이 보장되지 않으므로 — Step A(추출 품질 확인)를 게이트로 두고, 품질이 나쁘면 여기서 멈추고 Phase 2로 우선순위를 옮긴다.**
+
+### Step A — 오프라인 bbox 추출 + 품질 확인 (게이트)
+- `scripts/extract_bbox_cache.py` 신규: `PaliGemmaForConditionalGeneration.from_pretrained("google/paligemma-3b-pt-224")` 로드, 각 H5 에피소드의 각 프레임에 `"detect gray basket"` 프롬프트로 `generate()`, `<locy1><locx1><locy2><locx2>` 토큰 파싱(1024 그리드 정규화) → `(cx, cy, area)` ∈ [0,1].
+- 소규모 샘플(예: 3~5 에피소드, 각 에피소드 첫/중간/마지막 프레임)에 대해 박스를 이미지에 오버레이해서 PNG로 저장 → 눈으로 품질 확인. 박스가 바구니를 못 잡으면(예: 배경/로봇 자신을 잡거나 박스가 전체화면) 여기서 멈추고 보고.
+- 품질 통과 시 전체 245 에피소드(또는 holdout 제외 train/val 224개)에 대해 전체 캐시 생성, `bbox_cache.json`(또는 episode별 `.npy`)으로 저장.
+
+### Step B — 데이터셋 통합
+- `ActionChunkDataset.__getitem__`에 `use_bbox_cond` 옵션 추가: 캐시에서 윈도우(8프레임)에 대응하는 bbox 시퀀스 로드, `(window_size, 3)` 텐서 + 탐지 실패 프레임용 valid mask 반환.
+- HFlip 증강 시 `cx → 1-cx`로 같이 반전(MoNaVLA의 동일 버그 패턴을 미리 피함).
+
+### Step C — 모델 통합
+- `Pi0VLA`에 `bbox_proj: Linear(4, cond_dim)`(cx,cy,area,valid) 추가, bbox 토큰을 VLM cond 시퀀스에 concat해서 action expert에 전달. cross-attn은 가변 길이 시퀀스를 그대로 받으므로 구조 변경 없음 — 새 투영 레이어만 학습 필요.
+- 세 조건(image_only=현재 baseline, bbox_only=vision_tower 출력을 0으로 마스킹, bbox+image=둘 다)을 같은 config로 플래그 전환만으로 만들 수 있게 설계 — MoNaVLA `ablate_bbox_image_features.py`와 동일 철학.
+
+### Step D — 파일럿 학습 + 평가
+- 정형 9종(train/val, Phase 1 split) 기준 짧은 파일럿 학습(전체 재학습 아님, 빠른 검증용 epoch 수로) 후 `eval_closedloop.py --free-only`/`--regular-only`로 세 조건 비교.
+- 성공 기준: bbox+image 조건이 image_only(현재 baseline) 대비 `free_*` SR을 의미 있게 올리면 Phase 4(전체 재학습)로 승격, 아니면 MoNaVLA와 동일하게 "grounding 신호 분리만으론 부족"으로 결론 내리고 Phase 2(실데이터)에 집중.
+
+리스크: MoNaVLA 쪽도 "BBox는 보조, image가 핵심"이라는 결론이었음(bbox_only 67.4% vs image_only 75.6%) — grounding 신호가 만능 해법은 아닐 수 있음. Step A 게이트와 Step D 작은 파일럿으로 투자를 최소화하면서 검증.
 
 ## 5. Phase 4 — 통합 재학습 + 재평가
 
@@ -73,9 +90,9 @@ Phase 4 (통합 재학습/재평가) → Phase 2 데이터 일정량 확보 후
 
 ## 7. 다음 결정이 필요한 지점
 
-- [ ] Phase 1을 지금 바로 구현 승인할지 (`data/dataset.py` holdout 분리 + `eval_closedloop.py --free-only`)
+- [x] Phase 1 구현 승인
 - [ ] Phase 2 실데이터 수집 일정 (로봇/현장 작업이라 Claude가 직접 못함 — 사용자 스케줄)
-- [ ] Phase 3 grounding 주입 방식(별도 detector vs PaliGemma 내부 attention 재사용) 중 어느 쪽으로 파일럿할지
+- [x] Phase 3 grounding 주입 방식 결정 — **PaliGemma 자체 generate() detect** (사용자 승인, 2026-06-24)
 
 ---
 
@@ -83,5 +100,9 @@ Phase 4 (통합 재학습/재평가) → Phase 2 데이터 일정량 확보 후
 - [x] Phase 1 구현 승인
 - [x] Phase 1 구현 완료 (`data/dataset.py` exclude_free_holdout + `build_free_holdout()`, `eval_closedloop.py --free-only`. 상세: `docs/ABLATION_RESULTS_20260623.md` M10)
 - [ ] Phase 2 수집 시작
-- [ ] Phase 3 파일럿 설계 승인
+- [x] Phase 3 Detector 방식 승인 (PaliGemma generate() detect)
+- [x] Phase 3 Step A — bbox 추출 + 품질 확인 (게이트 통과, 44% 탐지율. `scripts/extract_bbox_cache.py`, `logs/bbox_cache.json` 244 에피소드)
+- [x] Phase 3 Step B — 데이터셋 통합 (`data/dataset.py`의 `bbox_cache_path`/`use_bbox_cond`, HFlip cx 반전 포함, unit test 통과)
+- [x] Phase 3 Step C — 모델 통합 (`Pi0VLA`의 `use_bbox_cond`/`bbox_only`, 3-way 조건 forward/loss 단위 테스트 통과)
+- [ ] Phase 3 Step D — 파일럿 학습/평가 (조건/epoch 수 등 실행 스코프 확정 필요, GPU 시간 소요 — 사용자 확인 후 실행)
 - [ ] Phase 4 재학습/재평가

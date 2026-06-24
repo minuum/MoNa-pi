@@ -156,3 +156,46 @@ train.py DataLoader sanity: images (4,8,3,224,224), actions (4,10,3) — 정상
 ### 다음
 
 Phase 2(실데이터 `free_*` 수집)·Phase 3(grounding 신호 파일럿) 진행 시 `scripts/eval_closedloop.py --free-only` 결과를 baseline으로 사용. 자세한 로드맵은 `plan.md` 참고.
+
+## M11 — Phase 3 Step A/B/C: gray basket bbox grounding 신호 파이프라인 구축 (2026-06-24)
+
+장기 로드맵(`plan.md`) Phase 3. MoNaVLA의 핵심 교훈(end-to-end VLM은 PM 높아도 closed-loop 0%, bbox+image decomposition은 closed-loop 66.7%)을 MoNa-pi에 이식하는 파일럿. **MoNa-pi 데이터엔 bbox 라벨이 전혀 없어** MoNaVLA처럼 "이미 있는 라벨을 가져다 쓰는" 게 아니라 추출 파이프라인을 처음부터 구축. Detector 방식은 사용자 승인으로 **PaliGemma 자체 `generate()` detect** 채택(추가 모델 불필요, 오프라인 1회성).
+
+### Step A — bbox 추출 + 품질 게이트
+
+`scripts/extract_bbox_cache.py` 신규: `google/paligemma-3b-pt-224`에 `"detect gray basket"` 프롬프트로 `generate()`, `<locY1><locX1><locY2><locX2>` 토큰 파싱(1024-bin 정규화) → `(cx, cy, area)`.
+
+소규모 오버레이 확인(3 에피소드 × 3프레임): 바구니가 화면에 충분히 크게 보이는 프레임에서는 박스가 매우 정확(타이트하게 바구니만 잡음). 에피소드 초반처럼 바구니가 작고 멀 때는 종종 `<eos>` 즉시 생성으로 탐지 실패(hallucination이 아니라 진짜 미검출 — 디버그로 `skip_special_tokens=False` 확인).
+
+전체 244개 에피소드(손상 파일 1개 자동 스킵) 추출 완료, `logs/bbox_cache.json`:
+```
+전체 프레임 4609개 중 valid(탐지 성공) 2025개 = 43.9%
+완전히 탐지 0건인 에피소드: 3개/244
+```
+속도: 0.18s/frame, 전체 약 13분.
+
+✅ **게이트 판단**: 통과. 탐지 성공률(44%)은 fine-tune 없는 zero-shot 한계로 낮은 편이지만, 성공한 박스의 정확도 자체는 높고 실패가 무작위 노이즈가 아니라 "객체가 작을 때"로 해석 가능한 패턴 — `valid` 마스크로 이미 설계에 반영돼 있어 Step B/C로 진행.
+
+### Step B — 데이터셋 통합
+
+`data/dataset.py`: `ActionChunkDataset(bbox_cache_path=...)` — 윈도우(8프레임)에 대응하는 `(cx,cy,area,valid)` 시퀀스를 `(window_size,4)` 텐서로 반환, 미탐지 프레임은 0벡터. HFlip 증강 시 `cx → 1-cx`로 동기 반전(MoNaVLA가 겪은 동일 버그를 미리 회피). `build_train_val_split()`/`build_free_holdout()`에도 `bbox_cache_path` 관통.
+
+단위 테스트(가짜 캐시로 검증): `(8,3,224,224)` 이미지 + `(8,4)` bbox 배치 정상, invalid 프레임이 정확히 0벡터로 채워짐 확인.
+
+### Step C — 모델 통합
+
+`models/pi0_core.py`: `Pi0VLA(use_bbox_cond=, bbox_only=)` — `bbox_proj: Linear(4, cond_dim)`로 bbox를 VLM cond 토큰과 같은 차원에 투영. `use_bbox_cond=True`면 VLM cond 시퀀스에 bbox 토큰을 concat(cross-attn은 가변 길이라 구조 변경 없음), `bbox_only=True`면 VLM cond를 전혀 안 쓰고 bbox 토큰만 사용(backbone 호출 자체를 스킵 — 추론 비용도 절감). `forward_backbone`/`compute_loss`/`sample_actions` 모두 `bbox=None` 기본값이라 기존 호출부(특히 `train.py`)는 변경 없이 그대로 동작.
+
+3-way 단위 테스트(랜덤 배치, `compute_loss` 통과 확인):
+```
+image_only(기존 baseline) loss: 2.047
+use_bbox_cond(bbox+image) loss: 2.125
+bbox_only                 loss: 2.219
+```
+(랜덤 가중치 기준 손실값이라 절대 수치는 의미 없음 — 세 경로 모두 에러 없이 forward/backward 가능함을 확인하는 게 목적.)
+
+`training/train.py`, `scripts/eval_closedloop.py`(`eval_episode`의 `bbox_frames` 인자, `--ckpt` 모델 로드 시 `use_bbox_cond`/`bbox_only` 플래그 관통)도 동일 패턴으로 업데이트, bbox 미사용 시(기존 config) 동작 동일.
+
+### Step D — 파일럿 학습/평가 (대기)
+
+세 조건(image_only / bbox_only / bbox+image)을 같은 정형 9종 train/val split으로 짧게 학습 후 `eval_closedloop.py --free-only`/`--regular-only` 비교. **GPU 학습 시간이 드는 단계라 실행 스코프(epoch 수, 조건 우선순위) 확정 후 진행** — `plan.md` 체크리스트 참고.

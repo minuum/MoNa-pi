@@ -110,6 +110,7 @@ class ActionChunkDataset(Dataset):
         ood_aug_p: float = 0.35,
         is_training: bool = True,
         file_list: list = None,
+        bbox_cache_path: str = None,
     ):
         self.directory = Path(directory)
         self.h5_files = file_list if file_list is not None else sorted(self.directory.glob("*.h5"))
@@ -124,6 +125,14 @@ class ActionChunkDataset(Dataset):
         self.use_ood_aug = use_ood_aug
         self.ood_aug_p = ood_aug_p
         self.is_training = is_training
+
+        # Phase 3 — PaliGemma detect()로 오프라인 추출한 gray basket bbox 캐시
+        # (scripts/extract_bbox_cache.py). 에피소드 stem → [{valid, cx, cy, area}, ...] (프레임 순서대로)
+        self._bbox_cache = None
+        if bbox_cache_path is not None:
+            import json
+            with open(bbox_cache_path) as f:
+                self._bbox_cache = json.load(f)
 
         # 전처리 파이프라인 초기화
         self.preprocessor = EpisodePreprocessor(
@@ -229,7 +238,8 @@ class ActionChunkDataset(Dataset):
         )
 
         # ── HFlip 증강 (MoNaVLA 계승) ─────────────────────────────
-        if self.augment and self.is_training and random.random() < 0.5:
+        do_hflip = self.augment and self.is_training and random.random() < 0.5
+        if do_hflip:
             images = torch.stack([TF.hflip(img) for img in images])
             # angular_z(dim=2) 부호 반전
             action_chunk = action_chunk.copy()
@@ -245,11 +255,27 @@ class ActionChunkDataset(Dataset):
             base_instr, action_chunk, is_training=self.is_training
         )
 
-        return {
+        result = {
             "images": images,           # (window_size, C, H, W)
             "actions": actions,         # (k, 3)  정규화됨
             "instructions": instruction,
         }
+
+        # ── Phase 3: gray basket bbox 컨디셔닝 (있으면) ───────────
+        if self._bbox_cache is not None:
+            stem = self.h5_files[f_idx].stem
+            frames = self._bbox_cache.get(stem, [])
+            bbox_window = []
+            for i in range(t - self.window_size + 1, t + 1):
+                if i < len(frames) and frames[i]["valid"]:
+                    e = frames[i]
+                    cx = 1.0 - e["cx"] if do_hflip else e["cx"]
+                    bbox_window.append([cx, e["cy"], e["area"], 1.0])
+                else:
+                    bbox_window.append([0.0, 0.0, 0.0, 0.0])
+            result["bbox"] = torch.tensor(bbox_window, dtype=torch.float32)  # (window_size, 4)
+
+        return result
 
     @property
     def normalizer(self):
@@ -269,6 +295,7 @@ def build_free_holdout(
     image_size: int = 384,
     preprocess: bool = True,
     normalize: bool = False,
+    bbox_cache_path: str = None,
 ) -> "ActionChunkDataset":
     """
     `free_*` 에피소드 전체로 구성된 고정 평가용 데이터셋.
@@ -288,6 +315,7 @@ def build_free_holdout(
         preprocess=preprocess,
         normalize=normalize,
         is_training=False,
+        bbox_cache_path=bbox_cache_path,
     )
 
 
@@ -307,6 +335,7 @@ def build_train_val_split(
     ood_aug_p: float = 0.35,
     seed: int = 42,
     exclude_free_holdout: bool = True,
+    bbox_cache_path: str = None,
 ):
     """
     데이터셋을 train/val 로 나눠 반환.
@@ -368,6 +397,7 @@ def build_train_val_split(
         use_ood_aug=use_ood_aug,
         ood_aug_p=ood_aug_p,
         is_training=True,
+        bbox_cache_path=bbox_cache_path,
     )
     val_ds = ActionChunkDataset(
         directory=directory,
@@ -382,6 +412,7 @@ def build_train_val_split(
         use_random_crop=False,
         use_counterfactual=False,
         is_training=False,
+        bbox_cache_path=bbox_cache_path,
     )
 
     return train_ds, val_ds

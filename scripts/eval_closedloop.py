@@ -127,6 +127,8 @@ def load_model(cfg: dict, ckpt: Path, device: torch.device) -> Pi0VLA:
         use_gemma_expert=m.get("use_gemma_expert", False),
         use_lora=m.get("use_lora", False),
         lora_r=m.get("lora_r", 16),
+        use_bbox_cond=m.get("use_bbox_cond", False),
+        bbox_only=m.get("bbox_only", False),
     )
     sf = ckpt / "model.safetensors"
     pt = ckpt / "pytorch_model.bin"
@@ -149,10 +151,14 @@ def eval_episode(
     cfg: dict,
     device: torch.device,
     dt: float = 0.1,
+    bbox_frames: list = None,
 ) -> dict:
     """
     단일 에피소드 closed-loop 평가.
     GT 이미지를 순서대로 모델에 입력, 첫 번째 예측 액션으로 궤적 구성.
+
+    bbox_frames: Phase 3 — extract_bbox_cache.py로 추출한 이 에피소드의
+    프레임별 [{valid, cx, cy, area}, ...] (없으면 None, bbox 컨디셔닝 비활성).
     """
     images_np   = ep_data["images"]   # (T, H, W, 3) uint8
     gt_actions  = ep_data["actions"]  # (T, 3) float32 raw
@@ -179,13 +185,24 @@ def eval_episode(
             frames.append(torch.from_numpy(arr))
         img_tensor = torch.stack(frames).unsqueeze(0).to(device)  # (1, N, C, H, W)
 
+        bbox_tensor = None
+        if bbox_frames is not None:
+            bbox_window = []
+            for i in range(t - window + 1, t + 1):
+                if i < len(bbox_frames) and bbox_frames[i]["valid"]:
+                    e = bbox_frames[i]
+                    bbox_window.append([e["cx"], e["cy"], e["area"], 1.0])
+                else:
+                    bbox_window.append([0.0, 0.0, 0.0, 0.0])
+            bbox_tensor = torch.tensor([bbox_window], dtype=torch.float32, device=device)  # (1, window, 4)
+
         # 현재 GT 액션 청크로 intent 태그 주입 (학습 시와 동일 형식)
         t_end   = min(t + horizon, len(gt_actions))
         chunk_gt = gt_actions[t: t_end]
         tagged_instr = _INJECTOR.inject(raw_instr, chunk_gt, is_training=False)
 
         # 모델 추론: sample_actions → (1, horizon, 3) raw physical
-        chunk = model.sample_actions(img_tensor, [tagged_instr], n_steps=_ODE_STEPS)  # (1,h,3)
+        chunk = model.sample_actions(img_tensor, [tagged_instr], n_steps=_ODE_STEPS, bbox=bbox_tensor)  # (1,h,3)
         first_action = chunk[0, 0].float().cpu().numpy()  # (3,) [vx, vy, wz]
         pred_actions.append(first_action)
 
@@ -278,10 +295,19 @@ def main():
     model = load_model(cfg, Path(args.ckpt), device)
     print(f"[CL Eval] 모델 로드 완료 (device={device}, ode_steps={_ODE_STEPS})")
 
+    # Phase 3 — bbox 캐시(있으면) 로드, 에피소드 stem으로 조회
+    bbox_cache = None
+    bbox_cache_path = cfg["data"].get("bbox_cache_path")
+    if bbox_cache_path:
+        with open(bbox_cache_path) as f:
+            bbox_cache = json.load(f)
+        print(f"[CL Eval] bbox 캐시 로드: {bbox_cache_path} ({len(bbox_cache)}개 에피소드)")
+
     results = []
     for f_idx in tqdm(val_f_idxs, desc="Episodes"):
         ep = base_ds._ep_cache[f_idx]
-        metrics = eval_episode(model, ep, cfg, device, dt=args.dt)
+        bbox_frames = bbox_cache.get(base_ds.h5_files[f_idx].stem) if bbox_cache else None
+        metrics = eval_episode(model, ep, cfg, device, dt=args.dt, bbox_frames=bbox_frames)
         if metrics.get("skipped"):
             continue
         metrics["episode_idx"] = f_idx

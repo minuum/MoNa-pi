@@ -126,9 +126,10 @@ def train_one_epoch(model, loader, optimizer, scheduler, accelerator, grad_clip:
         images = batch["images"]
         actions = batch["actions"]
         instructions = batch["instructions"]
+        bbox = batch.get("bbox")  # Phase 3 grounding 신호 (없으면 None, 하위호환)
 
         optimizer.zero_grad()
-        loss = model.compute_loss(images, instructions, actions)
+        loss = model.compute_loss(images, instructions, actions, bbox=bbox)
         accelerator.backward(loss)
 
         if grad_clip > 0:
@@ -150,7 +151,8 @@ def validate(model, loader, accelerator):
         images = batch["images"]
         actions = batch["actions"]
         instructions = batch["instructions"]
-        loss = model.compute_loss(images, instructions, actions)
+        bbox = batch.get("bbox")
+        loss = model.compute_loss(images, instructions, actions, bbox=bbox)
         total_loss += loss.item()
     return total_loss / len(loader)
 
@@ -211,6 +213,7 @@ def train(config_path: str):
         use_counterfactual=cfg["data"].get("use_counterfactual", False),
         use_ood_aug=cfg["data"].get("use_ood_aug", False),
         ood_aug_p=cfg["data"].get("ood_aug_p", 0.35),
+        bbox_cache_path=cfg["data"].get("bbox_cache_path"),
     )
     train_loader = DataLoader(
         train_ds,
@@ -242,6 +245,8 @@ def train(config_path: str):
         vision_model_id=cfg["model"].get("vision_model_id", "google/siglip-so400m-patch14-384"),
         lang_model_id=cfg["model"].get("lang_model_id", "google/gemma-2b"),
         paligemma_id=cfg["model"].get("paligemma_id", "google/paligemma-3b-pt-224"),
+        use_bbox_cond=cfg["model"].get("use_bbox_cond", False),
+        bbox_only=cfg["model"].get("bbox_only", False),
     )
     model = load_pretrained_weights(model, cfg["pretrain"].get("ckpt_path", ""))
 
