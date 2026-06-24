@@ -66,6 +66,10 @@ class MoNaPiEngine:
         use_paligemma: bool = True,
         load_pretrained_paligemma: bool = False,
         use_int8: bool = False,
+        use_gemma_expert: bool = False,
+        use_lora: bool = False,
+        lora_r: int = 16,
+        load_lerobot: bool = False,
         vision_model_id: str = "google/siglip-so400m-patch14-384",
         lang_model_id: str = "google/gemma-2b",
         paligemma_id: str = "google/paligemma-3b-pt-224",
@@ -82,6 +86,10 @@ class MoNaPiEngine:
         self.use_paligemma = use_paligemma
         self.load_pretrained_paligemma = load_pretrained_paligemma
         self.use_int8 = use_int8
+        self.use_gemma_expert = use_gemma_expert
+        self.use_lora = use_lora
+        self.lora_r = lora_r
+        self.load_lerobot = load_lerobot
         self.vision_model_id = vision_model_id
         self.lang_model_id = lang_model_id
         self.paligemma_id = paligemma_id
@@ -109,25 +117,45 @@ class MoNaPiEngine:
             use_paligemma=self.use_paligemma,
             load_pretrained_paligemma=self.load_pretrained_paligemma,
             use_int8=self.use_int8,
+            use_gemma_expert=self.use_gemma_expert,
+            use_lora=self.use_lora,
+            lora_r=self.lora_r,
+            load_lerobot=self.load_lerobot,
             vision_model_id=self.vision_model_id,
             lang_model_id=self.lang_model_id,
             paligemma_id=self.paligemma_id,
         )
 
         # Accelerate 저장 형식 로드 (CPU → 필터링 → GPU, MoNaVLA lean-loading 방식)
+        # strict=False는 의도된 부분 로드(backbone 동결 등)를 허용하기 위함이지만,
+        # 체크포인트 아키텍처(use_gemma_expert 등)가 config와 안 맞으면 조용히
+        # 일부만 로드되는 위험이 있어 missing/unexpected 키를 항상 로그로 남김.
         bin_path = self.model_path / "pytorch_model.bin"
         sf_path  = self.model_path / "model.safetensors"
         if bin_path.exists():
             state = torch.load(bin_path, map_location="cpu", weights_only=True)
-            self.model.load_state_dict(state, strict=False)
+            result = self.model.load_state_dict(state, strict=False)
             del state; gc.collect()
         elif sf_path.exists():
             from safetensors.torch import load_file
             state = load_file(str(sf_path), device="cpu")
-            self.model.load_state_dict(state, strict=False)
+            result = self.model.load_state_dict(state, strict=False)
             del state; gc.collect()
         else:
             print(f"[Engine] 경고: 가중치 파일 없음, 랜덤 가중치 사용")
+            result = None
+
+        if result is not None and (result.missing_keys or result.unexpected_keys):
+            n_total = len(list(self.model.state_dict().keys()))
+            print(f"[Engine] 경고: state_dict 불일치 — missing={len(result.missing_keys)}, "
+                  f"unexpected={len(result.unexpected_keys)} (전체 {n_total}개 키 중). "
+                  f"체크포인트와 config(use_gemma_expert/use_lora 등)가 일치하는지 확인 필요.")
+            if len(result.missing_keys) + len(result.unexpected_keys) > 0.3 * n_total:
+                raise RuntimeError(
+                    "[Engine] state_dict 불일치가 30% 이상 — 체크포인트 아키텍처와 "
+                    "config가 맞지 않을 가능성이 높음. 랜덤 가중치로 조용히 도는 것보다 "
+                    "안전하게 중단함."
+                )
 
         # INT8 모델은 device 이동 시 to()가 아닌 cuda() 사용 (BnB 요구사항)
         if self.use_int8:
