@@ -1,5 +1,5 @@
-# MoNa-pi 배포 설정 — Serbot2 (6/4 데모)
-# python inference/server.py --config configs/serbot2.yaml --ckpt checkpoints/best
+# MoNa-pi 배포 설정 — Serbot2
+# python inference/server.py --config configs/serbot2.yaml --ckpt checkpoints/gemma_expert/best
 
 model:
   action_dim: 3              # (linear_x, linear_y, angular_z)
@@ -10,6 +10,8 @@ model:
   paligemma_id: "google/paligemma-3b-pt-224"
   vision_model_id: "google/siglip-so400m-patch14-384"
   lang_model_id: "google/gemma-2b"
+  # CH8 ablation 최선: Gemma Expert가 전체 ablation 중 최고(75.5% full) — 6/24부로 기본값
+  use_gemma_expert: true
   # Jetson AGX: bitsandbytes INT8 CUDA 커널 미호환 → BF16 사용 (~6GB)
   # 통합 메모리 16GB + 스왑 24GB로 충분
   use_int8: false
