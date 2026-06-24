@@ -427,6 +427,16 @@
       누출을 제거한 진짜 held-out 평가에서도 같은 패턴(정형 100% / free_* 0%)이 재현됨 — CH9-2/9-4의 결론이 누출과 무관하게 견고함을 재확인. 다만 <strong>이 수정으로 위 9-1~9-4의 절대 SR 수치는 더 이상 재현되지 않는다</strong>(내부 split이 바뀌어 val 모집단 자체가 달라짐) — 그 비교들은 "당시 비교 사이의 상대적 결론"으로만 읽을 것.
     </div>
   </div>
+  <div class="finding-card info">
+    <div class="finding-title">9-6. M10 — free_* 고정 holdout 분리 (장기 로드맵 Phase 1, 6/24 추가)</div>
+    <div class="finding-body">
+      9-5에서 남긴 후속 검토(stratified val의 <code>free_*</code> 표본이 n=2뿐이라 통계적으로 약함)를 바로 처리. <code>build_train_val_split()</code>의 <code>stratify_free</code>를 <code>exclude_free_holdout</code>(기본 <code>True</code>)으로 교체해 <strong><code>free_*</code> 21개를 train/val 분할에서 완전히 제외</strong>하고, 신규 <code>build_free_holdout()</code>으로 매 실험마다 동일한 21개 전체를 평가하도록 고정했다. <code>eval_closedloop.py</code>에 <code>--free-only</code> 플래그 추가.
+      <br><br>
+      근거: 9-4(M7, 데이터 2배)와 9-3(M8, 합성 OOD 증강) 둘 다 <code>free_*</code> SR을 못 바꿨다 — <code>free_*</code>를 학습에 일부 끼워 넣는 게 이미 효과 없다고 확인된 상태에서, stratify로 val에 어떤 1~2개가 뽑히는지가 흔들리면 앞으로의 어떤 개선(실데이터 수집, grounding 신호 주입)도 "효과가 있었는지" 판단할 기준이 안정적이지 않다. 학습 신호로서는 버려도 되는 손실 대비, 고정 모집단으로 얻는 측정 안정성이 이후 모든 비교의 전제조건.
+      <br><br>
+      검증: train 202 / val 22 (둘 다 free_* 0개), free holdout 21개·368샘플(train+val과 파일 교집합 0), <code>train.py</code> DataLoader sanity 정상. 장기 로드맵(Phase 2: 실데이터 수집, Phase 3: grounding 신호 파일럿)은 <code>plan.md</code> 참고.
+    </div>
+  </div>
   <p style="color:var(--muted);font-size:0.85rem">전체 결과: <code>docs/ABLATION_RESULTS_20260623.md</code></p>
 </div>
 <hr class="chapter-divider">
