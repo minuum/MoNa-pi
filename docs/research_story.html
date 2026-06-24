@@ -409,6 +409,24 @@
       71.7% vs 73.6% — 53개 중 1개 에피소드 차이, 노이즈 수준. <strong>add_free로 데이터를 116→244ep(2배)로 늘려도 전체 SR은 거의 안 바뀜.</strong> CH9-2(정형 9종 0% 실패)와 CH9-3(M8 합성 증강 null)을 함께 보면, add_free 통합이 실제로 고친 건 정형 경로뿐이고 <code>free_*</code> OOD 일반화는 <strong>데이터 양을 늘리는 것만으로는 개선되지 않는다</strong>는 그림으로 수렴한다. 다음 단계는 양이 아니라 <code>free_*</code>류를 직접 타겟한 데이터 수집.
     </div>
   </div>
+  <div class="finding-card bad">
+    <div class="finding-title">9-5. M9 — train/val 누출 버그 발견 + 수정 (6/24 추가)</div>
+    <div class="finding-body">
+      "알고리즘적 미스 audit" 중 <code>data/dataset.py</code>의 <code>build_train_val_split()</code>을 점검하다 발견. 기존 구현은 <strong>윈도우(샘플) 생성 후</strong> <code>random_split()</code>으로 train/val을 나눴는데, <code>window_size=8</code> 슬라이딩 윈도우는 인접 윈도우끼리 7/8프레임이 겹친다 — 같은 에피소드의 윈도우가 train/val 양쪽으로 갈리는 누출이 발생.
+      <br><br>
+      실측(244ep, seed=42): val로 분류된 53개 에피소드 중 <strong>49개(92.5%)가 train에도 자기 자신의 다른 윈도우를 갖고 있었음.</strong> MoNaVLA의 <code>nav_h5_dataset_impl.py</code>는 처음부터 <strong>에피소드(파일) 단위</strong>로 나눈 뒤 윈도우를 생성하는 좋은 패턴을 갖고 있었는데 MoNa-pi엔 포팅이 안 돼 있었다.
+      <br><br>
+      <strong>수정</strong>: 파일 단위 분할로 재작성(교집합 0개 확인) + <code>free_*</code> 비율이 전체의 ~8%뿐이라 단순 shuffle로는 val에 0개 뽑히는 경우가 실제 발생(stratify 끄고 확인) — <code>stratify_free=True</code> 옵션으로 free_*/정형을 따로 비율 분할 후 합치도록 보강.
+      <table>
+        <thead><tr><th>카테고리(수정 후, n=17)</th><th>SR</th></tr></thead>
+        <tbody>
+          <tr><td>정형 9종(15개)</td><td><strong>100%</strong></td></tr>
+          <tr><td>free_*(2개)</td><td><strong>0%</strong></td></tr>
+        </tbody>
+      </table>
+      누출을 제거한 진짜 held-out 평가에서도 같은 패턴(정형 100% / free_* 0%)이 재현됨 — CH9-2/9-4의 결론이 누출과 무관하게 견고함을 재확인. 다만 <strong>이 수정으로 위 9-1~9-4의 절대 SR 수치는 더 이상 재현되지 않는다</strong>(내부 split이 바뀌어 val 모집단 자체가 달라짐) — 그 비교들은 "당시 비교 사이의 상대적 결론"으로만 읽을 것.
+    </div>
+  </div>
   <p style="color:var(--muted);font-size:0.85rem">전체 결과: <code>docs/ABLATION_RESULTS_20260623.md</code></p>
 </div>
 <hr class="chapter-divider">
