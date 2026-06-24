@@ -127,3 +127,32 @@ MoNaVLA의 `robovlm_nav/datasets/nav_h5_dataset_impl.py`(`stratified_split` 옵�
 ✅ **결론**: 누출을 제거한 진짜 held-out 평가에서도 **정형 9종 100% / free_* 0%** 패턴이 그대로 재현됨 — CH9-2/9-4의 "약점은 카테고리가 아니라 free_* OOD 전체"라는 결론이 누출과 무관하게 견고하다는 뜻. 다만 stratify된 val의 free_* 표본이 단 2개뿐이라 통계적으로는 약함 — `free_*` 21개 전체를 별도 고정 eval set으로 떼어 쓰는 방식이 더 안정적일 수 있음(후속 검토).
 
 ⚠️ **이 수정으로 인해 위 M5~M8 섹션의 절대 SR 수치는 더 이상 재현되지 않는다** — config는 그대로지만 내부 split 로직이 바뀌어 val 모집단 자체가 달라졌기 때문. M5~M8을 다시 정확히 재현하려면 동일 buggy split이 필요한데, 그건 의미가 없으므로 재실행하지 않음. 위 M5~M8 절들은 "그 당시 비교들 사이의 상대적 결론"으로만 읽을 것.
+
+## M10 — free_* 고정 holdout 분리 (Phase 1, 2026-06-24)
+
+M9에서 남긴 후속 검토(`free_*` stratified val 표본 n=2는 통계적으로 너무 약함)를 바로 처리. 장기 로드맵(`plan.md`) Phase 1.
+
+### 변경
+
+- `data/dataset.py`: `build_train_val_split()`의 `stratify_free` 파라미터를 `exclude_free_holdout`(기본 `True`)으로 교체. `free_*` 에피소드는 더 이상 train/val 분할 대상에 들어가지 않고 완전히 빠진다.
+- `build_free_holdout()` / `get_free_holdout_files()` 신규 — `free_*` 21개 전체를 매 실험마다 동일하게 평가할 수 있는 고정 데이터셋으로 반환.
+- `scripts/eval_closedloop.py`: `--free-only` 플래그 추가(`build_free_holdout()` 사용). `--regular-only`는 이제 val이 항상 정형뿐이라 no-op이지만 하위호환 위해 유지. 출력/JSON summary에 `population`("regular_val" | "free_holdout") 필드 추가.
+
+### 근거
+
+M7(데이터 2배)·M8(합성 OOD 증강) 둘 다 `free_*` SR을 못 바꿨다 — `free_*`를 학습에 일부 끼워 넣는 것 자체가 효과가 없다는 게 이미 확인된 상태. 반면 stratify로 val에 어떤 free_* 1~2개가 뽑히는지가 seed/실험마다 흔들리면 향후 어떤 개선(Phase 2 실데이터 수집, Phase 3 grounding 주입)을 시도해도 "효과가 있었는지"를 판단할 기준 모집단이 안정적이지 않다. 학습 신호로서는 버려도 되는 손실인 반면, 고정 모집단으로 얻는 측정 안정성은 이후 모든 비교의 전제조건이라 우선순위를 높게 잡음.
+
+### 검증
+
+```
+free holdout files: 21개 (get_free_holdout_files)
+build_train_val_split → train 202 / val 22, 둘 다 free_* 0개 (exclude 확인)
+build_free_holdout    → 21개 에피소드, 368 샘플, train+val과 파일 교집합 0개
+train.py DataLoader sanity: images (4,8,3,224,224), actions (4,10,3) — 정상
+```
+
+기존에 알려지지 않았던 손상 파일 1개 발견(`episode_260506_194517_target_left_straight_path__core__fixed_center.h5`, `Unable to synchronously open file (bad object header version number)`) — `_read_episode`에서 예외로 스킵되어 로딩엔 영향 없음. 이번 변경과 무관, 별도 데이터 정합성 이슈로 기록.
+
+### 다음
+
+Phase 2(실데이터 `free_*` 수집)·Phase 3(grounding 신호 파일럿) 진행 시 `scripts/eval_closedloop.py --free-only` 결과를 baseline으로 사용. 자세한 로드맵은 `plan.md` 참고.

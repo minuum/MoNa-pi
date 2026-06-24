@@ -32,7 +32,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from models.pi0_core import Pi0VLA
-from data.dataset import ActionChunkDataset, build_train_val_split
+from data.dataset import ActionChunkDataset, build_train_val_split, build_free_holdout
 from data.preprocessing import IntentPrefixInjector
 from safetensors.torch import load_file
 
@@ -215,9 +215,16 @@ def main():
     parser.add_argument("--dt",     type=float, default=0.1, help="제어 주기 (초)")
     parser.add_argument("--out",    default=None, help="결과 JSON 저장 경로")
     parser.add_argument("--regular-only", action="store_true",
-                        help="정형 9종 경로만 평가 (center/left/right × straight/left/right)")
+                        help="정형 9종 경로만 평가 (center/left/right × straight/left/right). "
+                             "2026-06-24 이후 val은 항상 정형뿐이라 사실상 no-op, 하위호환용으로 유지")
+    parser.add_argument("--free-only", action="store_true",
+                        help="free_* OOD 고정 holdout 전체를 평가 (train/val 분할과 무관, "
+                             "build_free_holdout() — 매 실험마다 동일 모집단)")
     parser.add_argument("--ode-steps", type=int, default=5, help="ODE 솔버 스텝 수")
     args = parser.parse_args()
+
+    if args.regular_only and args.free_only:
+        raise ValueError("--regular-only 와 --free-only는 동시에 줄 수 없음")
 
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
@@ -225,41 +232,44 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(cfg["train"].get("seed", 42))
 
-    # val split — training과 동일 seed
-    train_ds, val_ds = build_train_val_split(
-        directory=cfg["data"]["train_path"],
-        val_split=cfg["data"].get("val_split", 0.1),
-        k=cfg["model"]["horizon"],
-        window_size=cfg["data"]["window_size"],
-        image_size=cfg["data"].get("image_size", 224),
-        preprocess=cfg["data"].get("preprocess", True),
-        normalize=cfg["data"].get("normalize", False),
-        seed=cfg["train"].get("seed", 42),
-    )
-    # build_train_val_split이 에피소드 단위로 train/val을 먼저 나눈 뒤 각자
-    # ActionChunkDataset을 만들기 때문에(2026-06-24 누출 수정), val_ds는 더 이상
-    # Subset이 아니라 val 파일만 담은 독립 ActionChunkDataset. f_idx는 val_ds 자신의
-    # h5_files 기준 인덱스이므로 train_path 전체 글롭이 아니라 val_ds.h5_files로 매핑해야 함.
-    base_ds = val_ds.dataset if hasattr(val_ds, "dataset") else val_ds
-    val_indices = val_ds.indices if hasattr(val_ds, "indices") else list(range(len(val_ds)))
-    val_f_idxs  = sorted({base_ds.samples[i][0] for i in val_indices})
-
-    # 정형 경로 필터 (--regular-only)
-    REGULAR_PATHS = [
-        'center_straight', 'center_left', 'center_right',
-        'left_straight',   'left_left',   'left_right',
-        'right_straight',  'right_left',  'right_right',
-    ]
-    if args.regular_only:
-        idx_to_stem = {i: f.stem for i, f in enumerate(base_ds.h5_files)}
-        val_f_idxs = [i for i in val_f_idxs
-                      if any(kw in idx_to_stem.get(i, '') for kw in REGULAR_PATHS)]
-        print(f"[CL Eval] --regular-only: 정형 9종만 ({len(val_f_idxs)}개)")
+    if args.free_only:
+        # free_* 고정 holdout — train/val 분할에 전혀 포함되지 않는 별도 모집단
+        base_ds = build_free_holdout(
+            directory=cfg["data"]["train_path"],
+            k=cfg["model"]["horizon"],
+            window_size=cfg["data"]["window_size"],
+            image_size=cfg["data"].get("image_size", 224),
+            preprocess=cfg["data"].get("preprocess", True),
+            normalize=cfg["data"].get("normalize", False),
+        )
+        val_f_idxs = sorted({f_idx for f_idx, _t in base_ds.samples})
+        population = "free_holdout"
+    else:
+        # val split — training과 동일 seed. 2026-06-24부터 free_*는 build_train_val_split에서
+        # 완전히 제외되므로(exclude_free_holdout=True 기본) val은 항상 정형 9종만 포함.
+        train_ds, val_ds = build_train_val_split(
+            directory=cfg["data"]["train_path"],
+            val_split=cfg["data"].get("val_split", 0.1),
+            k=cfg["model"]["horizon"],
+            window_size=cfg["data"]["window_size"],
+            image_size=cfg["data"].get("image_size", 224),
+            preprocess=cfg["data"].get("preprocess", True),
+            normalize=cfg["data"].get("normalize", False),
+            seed=cfg["train"].get("seed", 42),
+        )
+        # build_train_val_split이 에피소드 단위로 train/val을 먼저 나눈 뒤 각자
+        # ActionChunkDataset을 만들기 때문에(2026-06-24 누출 수정), val_ds는 더 이상
+        # Subset이 아니라 val 파일만 담은 독립 ActionChunkDataset. f_idx는 val_ds 자신의
+        # h5_files 기준 인덱스이므로 train_path 전체 글롭이 아니라 val_ds.h5_files로 매핑해야 함.
+        base_ds = val_ds.dataset if hasattr(val_ds, "dataset") else val_ds
+        val_indices = val_ds.indices if hasattr(val_ds, "indices") else list(range(len(val_ds)))
+        val_f_idxs  = sorted({base_ds.samples[i][0] for i in val_indices})
+        population = "regular_val"
 
     if args.n_eps:
         val_f_idxs = val_f_idxs[:args.n_eps]
 
-    print(f"[CL Eval] {args.split} 에피소드 수: {len(val_f_idxs)}")
+    print(f"[CL Eval] population: {population}, 에피소드 수: {len(val_f_idxs)}")
     print(f"[CL Eval] ckpt: {args.ckpt}, fpe_thresh: {args.fpe_thresh}m")
 
     global _ODE_STEPS
@@ -292,6 +302,7 @@ def main():
     print("=" * 54)
     print("  MoNa-pi Offline Closed-Loop 평가 결과")
     print("=" * 54)
+    print(f"  Population    : {population}")
     print(f"  에피소드 수   : {n}")
     print(f"  Success Rate  : {n_ok}/{n} = {n_ok/n:.1%}  (FPE<{args.fpe_thresh}m & TLD∈[0.7,1.5])")
     print(f"  Mean FPE      : {mean_fpe:.4f} m")
@@ -302,6 +313,7 @@ def main():
     summary = {
         "ckpt": args.ckpt,
         "split": args.split,
+        "population": population,
         "n_episodes": n,
         "success_rate": round(n_ok / n, 4),
         "n_success": n_ok,
@@ -312,7 +324,7 @@ def main():
         "episodes": results,
     }
 
-    out_path = args.out or f"logs/cl_eval_{Path(args.ckpt).name}.json"
+    out_path = args.out or f"logs/cl_eval_{population}_{Path(args.ckpt).name}.json"
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)

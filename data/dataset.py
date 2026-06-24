@@ -257,6 +257,40 @@ class ActionChunkDataset(Dataset):
         return self.preprocessor.normalizer
 
 
+def get_free_holdout_files(directory: str) -> list:
+    """`free_*` 에피소드 전체 (train/val 분할 대상에서 제외되는 고정 OOD holdout)."""
+    return sorted(f for f in Path(directory).glob("*.h5") if "free_" in f.name)
+
+
+def build_free_holdout(
+    directory: str,
+    k: int = 10,
+    window_size: int = 8,
+    image_size: int = 384,
+    preprocess: bool = True,
+    normalize: bool = False,
+) -> "ActionChunkDataset":
+    """
+    `free_*` 에피소드 전체로 구성된 고정 평가용 데이터셋.
+
+    train/val 분할에서 완전히 빠지므로 매 실험마다 동일한 모집단으로
+    OOD(free_*) SR을 비교할 수 있다. 증강/counterfactual 없음(평가 전용).
+    """
+    free_files = get_free_holdout_files(directory)
+    if not free_files:
+        raise FileNotFoundError(f"free_* H5 파일을 찾을 수 없음: {directory}")
+    return ActionChunkDataset(
+        directory=directory,
+        file_list=free_files,
+        k=k,
+        window_size=window_size,
+        image_size=image_size,
+        preprocess=preprocess,
+        normalize=normalize,
+        is_training=False,
+    )
+
+
 def build_train_val_split(
     directory: str,
     val_split: float = 0.1,
@@ -272,7 +306,7 @@ def build_train_val_split(
     use_ood_aug: bool = False,
     ood_aug_p: float = 0.35,
     seed: int = 42,
-    stratify_free: bool = True,
+    exclude_free_holdout: bool = True,
 ):
     """
     데이터셋을 train/val 로 나눠 반환.
@@ -286,12 +320,14 @@ def build_train_val_split(
     2026-06-24 — MoNaVLA의 robovlm_nav/datasets/nav_h5_dataset_impl.py처럼
     파일 단위로 먼저 나눠 이 문제를 제거.)
 
-    stratify_free=True(기본): `free_*` 에피소드와 정형 9종 에피소드를 따로
-    val_split 비율로 나눠 합친다. free_* 비율이 전체의 ~8%라 단순 무작위
-    분할(seed 하나로 통째 shuffle)에서는 val에 free_*가 0개 뽑히는 경우가
-    실제로 발생함(2026-06-24, seed=42에서 확인) — free_* OOD 실패율을
-    추적하는 게 이 프로젝트 평가의 핵심이라 stratify 없이는 eval이
-    무의미해질 수 있음.
+    exclude_free_holdout=True(기본, 2026-06-24~): `free_*` 에피소드는 이
+    train/val 분할에 전혀 포함되지 않는다. 대신 `build_free_holdout()`이
+    반환하는 고정 데이터셋으로 따로 평가한다. 이전엔 stratify_free로
+    val에 일부(seed당 1~2개)만 끼워 넣었는데, 실험마다 어떤 free_*가
+    val에 들어가는지가 흔들려서 SR 비교가 불안정했음(n=2 수준).
+    `free_*`를 학습에 추가해도 SR이 안 바뀐다는 게 이미 M7/M8에서
+    확인됐으므로, 학습 신호로서의 손실보다 고정 모집단으로 평가
+    안정성을 얻는 게 더 가치 있다고 판단함.
 
     Returns:
         train_dataset, val_dataset
@@ -306,13 +342,10 @@ def build_train_val_split(
         n_val = max(1, int(len(shuffled) * ratio)) if files else 0
         return shuffled[:n_val], shuffled[n_val:]
 
-    if stratify_free:
-        free_files = [f for f in all_files if "free_" in f.name]
+    if exclude_free_holdout:
         regular_files = [f for f in all_files if "free_" not in f.name]
-        val_free, train_free = _split_group(free_files, val_split)
-        val_reg, train_reg = _split_group(regular_files, val_split)
-        val_files = sorted(val_free + val_reg)
-        train_files = sorted(train_free + train_reg)
+        val_files, train_files = _split_group(regular_files, val_split)
+        val_files, train_files = sorted(val_files), sorted(train_files)
     else:
         shuffled = all_files.copy()
         random.Random(seed).shuffle(shuffled)
