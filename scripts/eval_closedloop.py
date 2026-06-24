@@ -236,9 +236,11 @@ def main():
         normalize=cfg["data"].get("normalize", False),
         seed=cfg["train"].get("seed", 42),
     )
+    # build_train_val_split이 에피소드 단위로 train/val을 먼저 나눈 뒤 각자
+    # ActionChunkDataset을 만들기 때문에(2026-06-24 누출 수정), val_ds는 더 이상
+    # Subset이 아니라 val 파일만 담은 독립 ActionChunkDataset. f_idx는 val_ds 자신의
+    # h5_files 기준 인덱스이므로 train_path 전체 글롭이 아니라 val_ds.h5_files로 매핑해야 함.
     base_ds = val_ds.dataset if hasattr(val_ds, "dataset") else val_ds
-
-    # val에 속하는 에피소드 f_idx 추출
     val_indices = val_ds.indices if hasattr(val_ds, "indices") else list(range(len(val_ds)))
     val_f_idxs  = sorted({base_ds.samples[i][0] for i in val_indices})
 
@@ -249,8 +251,7 @@ def main():
         'right_straight',  'right_left',  'right_right',
     ]
     if args.regular_only:
-        h5_files = sorted(Path(cfg["data"]["train_path"]).glob("*.h5"))
-        idx_to_stem = {i: f.stem for i, f in enumerate(h5_files)}
+        idx_to_stem = {i: f.stem for i, f in enumerate(base_ds.h5_files)}
         val_f_idxs = [i for i in val_f_idxs
                       if any(kw in idx_to_stem.get(i, '') for kw in REGULAR_PATHS)]
         print(f"[CL Eval] --regular-only: 정형 9종만 ({len(val_f_idxs)}개)")

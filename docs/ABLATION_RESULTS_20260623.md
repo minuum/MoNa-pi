@@ -1,5 +1,13 @@
 # Ablation Pipeline 결과 (M6 → M5 → M7)
 
+> ⚠️ **2026-06-24 중요 정정**: 이 문서의 M5/M6/M7/M8 숫자는 모두 **train/val 누출이 있던
+> 구버전 split**으로 측정됐다(아래 "M9 — train/val 누출 버그 수정" 참고). 윈도우 단위
+> random_split 때문에 "val 에피소드"의 92.5%가 train에도 자기 자신의 다른 윈도우를 갖고
+> 있었음 — 즉 이 문서의 SR 숫자들은 진짜 held-out 성능이 아니라 다소 낙관적인 값일 수 있다.
+> 다만 M5/M6/M7/M8/baseline이 전부 **동일한 leaky split**을 공유했으므로 그들 사이의
+> **상대 비교**(증강 효과 없음, ODE steps 무관, 116ep≈244ep)는 여전히 유효하다고 판단함 —
+> 절대 SR 수치만 곧이곧대로 읽지 말 것.
+
 > 실행: 2026-06-23 18:00~20:47 (minum 서버, `monapi-train` 브랜치)
 > `scripts/run_ablation.sh` (2026-06-02 작성, 이번에 처음 실행) — 중간에 브랜치 전환 실수로
 > M5 eval 단계가 한 번 끊겼다가(`scripts/eval_closedloop.py`가 `monapi-driving`에는 없는 파일이라
@@ -86,3 +94,36 @@ baseline과 M5(no-aug) 둘 다 동일하게 **free fail/total = 14/15, regular f
 - ✅ **약점은 `free_*` OOD 프로브 전체(정형 9종 경로는 100%)** — baseline과 M5(no-aug)가 73.6%/73.6%로 동일하고, 실패 14건 전부 `free_*`(14/15), 정형 경로 실패 0건(0/38)으로 정확히 일치.
 - ❌ **이미지 레벨 합성 OOD 증강(M8)은 효과 없음** — baseline/M5/M8 전부 동일한 14개 에피소드가 실패. 액션 레이블이 안 바뀌는 합성 증강의 구조적 한계로 추정. **실제 free_* 데이터 추가 수집이 유일한 다음 단계.**
 - ✅ **116ep vs 244ep, 진짜 apples-to-apples 비교 완료(6/24)**: 동일 eval 모집단(n=53)에서 71.7% vs 73.6% — 노이즈 수준 차이. `add_free`로 데이터를 2배로 늘려도 전체 SR은 거의 그대로. 정형 9종 경로 보강에는 효과가 있었겠지만(M5에서 0% 실패 확인), `free_*` OOD 일반화는 데이터 양만으로 개선되지 않음 — M8의 합성 증강 null 결과와 같은 결론으로 수렴.
+
+## M9 — train/val 누출 버그 발견 + 수정 (2026-06-24)
+
+`알고리즘적 미스 audit` 중 `data/dataset.py`의 `build_train_val_split()`을 들여다보다 발견.
+
+### 버그
+
+기존 구현은 **윈도우(샘플) 생성 후** `torch.utils.data.random_split()`으로 train/val을 나눴다. 윈도우는 `window_size=8`, `k=10`(horizon) 기준으로 한 에피소드 안에서 `t`를 1씩 밀며 슬라이딩하므로, 인접한 두 윈도우는 입력 이미지 8프레임 중 7프레임이 겹친다. random_split이 윈도우 단위로 작동하면 **같은 에피소드의 인접 윈도우가 train과 val에 양쪽으로 갈리는 일이 빈번**하게 일어난다.
+
+실측(`configs/train.yaml`, 244ep, seed=42): val로 분류된 53개 에피소드 중 **49개(92.5%)가 train 쪽에도 자기 자신의 다른 윈도우를 갖고 있었다.** 즉 "held-out" 평가가 실제로는 거의 다 봤던 에피소드를 다른 프레임 오프셋으로 다시 보는 것에 가까웠다 — `eval_closedloop.py`가 episode 단위로 전체 궤적을 재생하긴 했지만, 그 episode의 다른 윈도우는 이미 gradient에 반영된 상태였던 것.
+
+MoNaVLA의 `robovlm_nav/datasets/nav_h5_dataset_impl.py`(`stratified_split` 옵션 포함)는 처음부터 **에피소드(파일) 단위**로 train/val을 나눈 뒤 윈도우를 생성한다 — 이 프로젝트가 참고해야 했던 "좋은 센스"였는데 MoNa-pi 쪽엔 포팅되지 않았던 부분.
+
+### 수정
+
+`build_train_val_split()`을 파일 단위 분할로 재작성, `ActionChunkDataset`에 `file_list` 파라미터 추가(주어지면 디렉토리 전체 글롭 대신 그 목록만 사용). 추가로 `stratify_free=True`(기본값) 옵션 — `free_*`/정형 9종을 따로 묶어 각각 `val_split` 비율로 나눠 합침. 이유: 단순 통째 shuffle로는 `free_*`가 전체의 ~8%뿐이라 val에 0개 뽑히는 경우가 실제로 발생함(seed=42, stratify 끄면 확인됨) — `free_*` 실패율 추적이 이 프로젝트 평가의 핵심이라 stratify 없이는 eval이 무의미해질 위험이 있었음.
+
+검증:
+- 수정 후 train 파일/val 파일 교집합 = **0개** (245개 중 train 221 / val 24).
+- `train.py`의 DataLoader 빌드 sanity test 정상 동작 확인(배치 shape 정상).
+- `scripts/eval_closedloop.py`도 `val_ds`가 더 이상 `Subset`이 아니므로(이제 파일 단위로 분리된 독립 `ActionChunkDataset`) `--regular-only` 필터의 파일명 매핑을 `val_ds.h5_files` 기준으로 수정(기존엔 `train_path` 전체 글롭 기준이라 인덱스가 안 맞을 뻔했음).
+
+### 누출 수정 후 첫 baseline (checkpoints/best, stratified split, n=17)
+
+| 카테고리 | 구성 | 결과 |
+|---|---|---|
+| 정형 9종 | 15개 | **15/15 = 100%** (FPE 0.026~0.183m) |
+| `free_*` | 2개(diagonal_right ×2) | **0/2 = 0%** (FPE 1.11m, 1.35m) |
+| 전체 | 17개 | 88.2% |
+
+✅ **결론**: 누출을 제거한 진짜 held-out 평가에서도 **정형 9종 100% / free_* 0%** 패턴이 그대로 재현됨 — CH9-2/9-4의 "약점은 카테고리가 아니라 free_* OOD 전체"라는 결론이 누출과 무관하게 견고하다는 뜻. 다만 stratify된 val의 free_* 표본이 단 2개뿐이라 통계적으로는 약함 — `free_*` 21개 전체를 별도 고정 eval set으로 떼어 쓰는 방식이 더 안정적일 수 있음(후속 검토).
+
+⚠️ **이 수정으로 인해 위 M5~M8 섹션의 절대 SR 수치는 더 이상 재현되지 않는다** — config는 그대로지만 내부 split 로직이 바뀌어 val 모집단 자체가 달라졌기 때문. M5~M8을 다시 정확히 재현하려면 동일 buggy split이 필요한데, 그건 의미가 없으므로 재실행하지 않음. 위 M5~M8 절들은 "그 당시 비교들 사이의 상대적 결론"으로만 읽을 것.

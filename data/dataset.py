@@ -3,7 +3,7 @@ import random
 import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
-from torch.utils.data import Dataset, random_split
+from torch.utils.data import Dataset
 import h5py
 import numpy as np
 from PIL import Image as PILImage
@@ -109,9 +109,10 @@ class ActionChunkDataset(Dataset):
         use_ood_aug: bool = False,
         ood_aug_p: float = 0.35,
         is_training: bool = True,
+        file_list: list = None,
     ):
         self.directory = Path(directory)
-        self.h5_files = sorted(self.directory.glob("*.h5"))
+        self.h5_files = file_list if file_list is not None else sorted(self.directory.glob("*.h5"))
         if not self.h5_files:
             raise FileNotFoundError(f"H5 파일을 찾을 수 없음: {self.directory}")
 
@@ -271,16 +272,57 @@ def build_train_val_split(
     use_ood_aug: bool = False,
     ood_aug_p: float = 0.35,
     seed: int = 42,
+    stratify_free: bool = True,
 ):
     """
     데이터셋을 train/val 로 나눠 반환.
     train: augment/counterfactual 활성화 / val: 비활성화
 
+    에피소드(h5 파일) 단위로 먼저 분할한 뒤 각자 윈도우를 생성한다.
+    (이전엔 윈도우 생성 후 윈도우 단위로 random_split — window_size=8,
+    k=10 윈도우끼리는 프레임 7/8이 겹쳐서 같은 에피소드의 인접 윈도우가
+    train/val에 양쪽으로 갈리는 누출이 있었음. 92.5%의 "val 에피소드"가
+    실제로는 train에도 자기 자신의 다른 윈도우를 갖고 있었던 것으로 확인됨,
+    2026-06-24 — MoNaVLA의 robovlm_nav/datasets/nav_h5_dataset_impl.py처럼
+    파일 단위로 먼저 나눠 이 문제를 제거.)
+
+    stratify_free=True(기본): `free_*` 에피소드와 정형 9종 에피소드를 따로
+    val_split 비율로 나눠 합친다. free_* 비율이 전체의 ~8%라 단순 무작위
+    분할(seed 하나로 통째 shuffle)에서는 val에 free_*가 0개 뽑히는 경우가
+    실제로 발생함(2026-06-24, seed=42에서 확인) — free_* OOD 실패율을
+    추적하는 게 이 프로젝트 평가의 핵심이라 stratify 없이는 eval이
+    무의미해질 수 있음.
+
     Returns:
         train_dataset, val_dataset
     """
-    train_full = ActionChunkDataset(
+    all_files = sorted(Path(directory).glob("*.h5"))
+    if not all_files:
+        raise FileNotFoundError(f"H5 파일을 찾을 수 없음: {directory}")
+
+    def _split_group(files, ratio):
+        shuffled = list(files)
+        random.Random(seed).shuffle(shuffled)
+        n_val = max(1, int(len(shuffled) * ratio)) if files else 0
+        return shuffled[:n_val], shuffled[n_val:]
+
+    if stratify_free:
+        free_files = [f for f in all_files if "free_" in f.name]
+        regular_files = [f for f in all_files if "free_" not in f.name]
+        val_free, train_free = _split_group(free_files, val_split)
+        val_reg, train_reg = _split_group(regular_files, val_split)
+        val_files = sorted(val_free + val_reg)
+        train_files = sorted(train_free + train_reg)
+    else:
+        shuffled = all_files.copy()
+        random.Random(seed).shuffle(shuffled)
+        n_val = max(1, int(len(shuffled) * val_split))
+        val_files = sorted(shuffled[:n_val])
+        train_files = sorted(shuffled[n_val:])
+
+    train_ds = ActionChunkDataset(
         directory=directory,
+        file_list=train_files,
         k=k,
         window_size=window_size,
         image_size=image_size,
@@ -294,8 +336,9 @@ def build_train_val_split(
         ood_aug_p=ood_aug_p,
         is_training=True,
     )
-    val_full = ActionChunkDataset(
+    val_ds = ActionChunkDataset(
         directory=directory,
+        file_list=val_files,
         k=k,
         window_size=window_size,
         image_size=image_size,
@@ -307,15 +350,5 @@ def build_train_val_split(
         use_counterfactual=False,
         is_training=False,
     )
-
-    # 동일 seed로 같은 에피소드를 train/val로 분할
-    n_val_t = max(1, int(len(train_full) * val_split))
-    n_train = len(train_full) - n_val_t
-    n_val_v = max(1, int(len(val_full) * val_split))
-
-    generator = torch.Generator().manual_seed(seed)
-    train_ds, _ = random_split(train_full, [n_train, n_val_t], generator=generator)
-    generator2  = torch.Generator().manual_seed(seed)
-    _, val_ds   = random_split(val_full,   [len(val_full) - n_val_v, n_val_v], generator=generator2)
 
     return train_ds, val_ds
