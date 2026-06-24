@@ -393,6 +393,22 @@
       regular(24)=full(24)=100% — 그러나 이 데이터셋 자체에 hard 카테고리 평가 에피소드가 거의 없어서, "작은 데이터셋이 더 낫다"는 결론으로 이어질 수 없음. M5(n=53)와 직접 비교는 <strong>apples-to-apples가 아님</strong> — 후속 작업으로 남김.
     </div>
   </div>
+  <div class="finding-card good">
+    <div class="finding-title">9-4. M7 진짜 apples-to-apples 비교 (6/24 추가) — 116ep와 244ep는 거의 동일</div>
+    <div class="finding-body">
+      M7 체크포인트(<code>checkpoints/ep116/best</code>)를 M5/M8과 <strong>동일한 eval 모집단</strong>(244ep val split, full n=53)에 직접 통과시켜 진짜 비교를 완성했다.
+      <table>
+        <thead><tr><th>구성</th><th>SR(동일 n=53)</th><th>FPE</th></tr></thead>
+        <tbody>
+          <tr><td>baseline(244ep)</td><td>73.6%</td><td>0.3906m</td></tr>
+          <tr><td>M5(244ep, no-aug)</td><td>73.6%</td><td>0.3868m</td></tr>
+          <tr><td>M8(244ep, ood-aug)</td><td>73.6%</td><td>0.3944m</td></tr>
+          <tr><td><strong>M7(116ep)</strong></td><td><strong>71.7%</strong></td><td><strong>0.3790m</strong></td></tr>
+        </tbody>
+      </table>
+      71.7% vs 73.6% — 53개 중 1개 에피소드 차이, 노이즈 수준. <strong>add_free로 데이터를 116→244ep(2배)로 늘려도 전체 SR은 거의 안 바뀜.</strong> CH9-2(정형 9종 0% 실패)와 CH9-3(M8 합성 증강 null)을 함께 보면, add_free 통합이 실제로 고친 건 정형 경로뿐이고 <code>free_*</code> OOD 일반화는 <strong>데이터 양을 늘리는 것만으로는 개선되지 않는다</strong>는 그림으로 수렴한다. 다음 단계는 양이 아니라 <code>free_*</code>류를 직접 타겟한 데이터 수집.
+    </div>
+  </div>
   <p style="color:var(--muted);font-size:0.85rem">전체 결과: <code>docs/ABLATION_RESULTS_20260623.md</code></p>
 </div>
 <hr class="chapter-divider">
