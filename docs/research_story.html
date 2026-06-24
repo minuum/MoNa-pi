@@ -437,6 +437,23 @@
       검증: train 202 / val 22 (둘 다 free_* 0개), free holdout 21개·368샘플(train+val과 파일 교집합 0), <code>train.py</code> DataLoader sanity 정상. 장기 로드맵(Phase 2: 실데이터 수집, Phase 3: grounding 신호 파일럿)은 <code>plan.md</code> 참고.
     </div>
   </div>
+  <div class="finding-card bad">
+    <div class="finding-title">9-7. Phase 3 파일럿 — gray basket bbox grounding 3-way 비교 (6/25 추가)</div>
+    <div class="finding-body">
+      MoNaVLA 교훈(end-to-end는 closed-loop 0%, bbox+image decomposition은 66.7%) 이식 파일럿. MoNa-pi엔 bbox 라벨이 없어 PaliGemma 자체 <code>generate()</code> detect로 "gray basket" 오프라인 추출(244 에피소드, 4609프레임 중 valid 43.9%) 후 3조건(image_only/bbox_only/bbox+image concat) 동일 조건(15 epoch, 정형 9종 train 202/val 22)으로 학습, <code>--free-only</code>(n=20, 새 고정 holdout)·<code>--regular-only</code>(n=15)로 평가.
+      <table>
+        <thead><tr><th>조건</th><th>학습시간</th><th>regular SR</th><th>free SR</th></tr></thead>
+        <tbody>
+          <tr><td>image_only(baseline)</td><td>28분</td><td>100%</td><td><strong>15.0%</strong>(3/20)</td></tr>
+          <tr><td>bbox_only</td><td><strong>4.5분</strong>(백본 스킵)</td><td>100%</td><td><strong>20.0%</strong>(4/20)</td></tr>
+          <tr><td>bbox+image(concat)</td><td>27분</td><td><strong>0%</strong></td><td><strong>0%</strong></td></tr>
+        </tbody>
+      </table>
+      <strong>가장 중요한 발견(예상 밖)</strong>: 이번이 <code>free_*</code> SR을 n=20(9-6 이전 M9는 n=2)으로 처음 측정한 결과다 — image_only 기준으로도 0%가 아니라 <strong>15%</strong>. M9의 "free_* 0%"는 표본 2개의 통계적 한계였을 뿐, 보편적 사실이 아니었다는 게 드러남. 9-6(Phase 1 고정 holdout)이 의도한 대로 더 신뢰 가능한 측정을 만들어냄.
+      <br><br>
+      bbox_only가 image_only보다 약간 우위(20% vs 15%, 1개 에피소드 차이 — 이 n에서는 노이즈 수준)면서 PaliGemma 3B 백본 호출을 생략해 <strong>6배 빠름</strong>. bbox+image는 val_loss가 세 조건 중 가장 낮았는데(0.0625) SR은 0% — FPE는 양호(0.16m, threshold 0.5m 이내)한데 <strong>TLD가 0.45~0.47로 일관되게 붕괴</strong>(방향은 맞지만 속도가 expert의 절반). 학습 안 된 bbox 토큰을 VLM cond에 단순 concat하면 cross-attn의 attention mass가 희석돼 액션 크기가 줄어드는 것으로 추정 — 그라운딩 신호 자체의 무용함이 아니라 naive concat 설계의 결함. loss만 보고 판단하면 함정(가장 낮은 loss가 가장 나쁜 SR)이라는 교훈도 남음.
+    </div>
+  </div>
   <p style="color:var(--muted);font-size:0.85rem">전체 결과: <code>docs/ABLATION_RESULTS_20260623.md</code></p>
 </div>
 <hr class="chapter-divider">

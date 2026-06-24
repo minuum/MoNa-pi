@@ -196,6 +196,24 @@ bbox_only                 loss: 2.219
 
 `training/train.py`, `scripts/eval_closedloop.py`(`eval_episode`의 `bbox_frames` 인자, `--ckpt` 모델 로드 시 `use_bbox_cond`/`bbox_only` 플래그 관통)도 동일 패턴으로 업데이트, bbox 미사용 시(기존 config) 동작 동일.
 
-### Step D — 파일럿 학습/평가 (대기)
+### Step D — 파일럿 학습/평가 (완료, 2026-06-25)
 
-세 조건(image_only / bbox_only / bbox+image)을 같은 정형 9종 train/val split으로 짧게 학습 후 `eval_closedloop.py --free-only`/`--regular-only` 비교. **GPU 학습 시간이 드는 단계라 실행 스코프(epoch 수, 조건 우선순위) 확정 후 진행** — `plan.md` 체크리스트 참고.
+세 조건(`configs/pilot_image_only.yaml` / `pilot_bbox_only.yaml` / `pilot_bbox_image.yaml`) 모두 동일 조건(정형 9종 train 202ep/val 22ep, epochs=15, lr=1e-4, lerobot_pi0_backbone에서 시작)으로 학습 후 `eval_closedloop.py --free-only`/`--regular-only`(free holdout 20개, 손상 파일 1개 제외) 평가.
+
+| 조건 | 학습시간 | val_loss(best) | regular SR(n=15) | free SR(n=20) | FPE(regular/free) | TLD(regular/free) |
+|---|---|---|---|---|---|---|
+| image_only(baseline) | 28분 | 0.0763 | **100%** | **15.0%** (3/20) | 0.042 / 1.029 | 0.939 / 0.945 |
+| bbox_only | **4.5분**(backbone 스킵) | 0.0713 | **100%** | **20.0%** (4/20) | 0.044 / 1.008 | 0.901 / 0.893 |
+| bbox+image(concat) | 27분 | **0.0625**(가장 낮음) | **0%** | **0%** | 0.160 / 1.354 | **0.455 / 0.466** |
+
+**가장 중요한 발견(예상 밖)**: 이번이 `free_*` SR을 **n=20**(이전 M9는 n=2)으로 처음 측정한 결과다. M9의 "free_* 0%"는 stratified val 표본이 단 2개뿐이라 통계적으로 약하다고 이미 적어뒀던 우려가 실제로 맞았음 — **새 고정 holdout(n=20)으로 다시 보니 image_only 기준으로도 15%(0%가 아님)**. M9의 결론("정형 100%/free_* 0%")은 *그 시점 그 체크포인트*(다른 학습 조건, 다른 split)에서의 관측이었을 뿐 보편적 사실이 아니었다는 뜻 — Phase 1(고정 holdout)이 의도한 대로 작동해 더 신뢰 가능한 그림을 드러냈다.
+
+**bbox_only가 image_only보다 약간 우위(20% vs 15%, 4/20 vs 3/20)** — 1개 에피소드 차이라 이 n에서는 노이즈 수준이지만, MoNaVLA의 "grounding 분리가 closed-loop에 도움" 가설과 방향이 일치하고, **PaliGemma 3B 백본 호출 자체를 생략해 6배 빠르다**(4.5분 vs 28분)는 실용적 이점도 확인됨.
+
+**bbox+image(naive concat)는 망가짐 — 단, 흥미로운 방식으로**: val_loss는 세 조건 중 가장 낮았는데(0.0625) closed-loop SR은 0%. 원인 분석: FPE는 오히려 양호(regular 0.16m, baseline 0.042m보다는 나쁘지만 fpe_thresh 0.5m 안에 듦)한데 **TLD가 0.45~0.47로 일관되게 붕괴**(success 조건의 TLD∈[0.7,1.5] 미달) — 로봇이 방향은 대체로 맞게 가지만 속도/이동거리가 expert의 절반 수준으로 체계적으로 느려짐. VLM cond 시퀀스에 학습 안 된 bbox 토큰을 단순 concat하면 cross-attn의 attention mass가 희석되면서 액션 크기(velocity magnitude)가 줄어드는 것으로 추정 — **그라운딩 신호 자체의 무용함이 아니라 naive concat 설계의 결함**으로 해석. 향후 시도한다면 게이팅/스케일 보정이 있는 결합 방식이 필요해 보임(이번 파일럿 스코프 밖).
+
+### 결론
+
+- ✅ **Phase 1(고정 free_* holdout)이 제 역할을 함**: n=2→n=20으로 표본이 커지자 "free_* 0%"라는 강한 주장이 무너지고 15~20%라는 더 현실적인 그림이 드러남. 향후 모든 free_* SR 비교는 이 n=20 기준으로.
+- ⚠️ **bbox+image 단순 concat은 쓰지 말 것** — TLD 붕괴로 SR 0%. loss만 보고 판단하면 함정(가장 낮은 loss가 가장 나쁜 SR).
+- 🤔 **bbox_only는 가벼운 옵션으로 가치 있음**(SR 비슷~약간 우위, 6배 빠름) — 추가 검증(더 큰 n, 더 많은 epoch) 가치 있으나 이번 n=1 에피소드 차이만으로 확정 결론 내리지 않음.

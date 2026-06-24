@@ -104,5 +104,5 @@ Phase 4 (통합 재학습/재평가) → Phase 2 데이터 일정량 확보 후
 - [x] Phase 3 Step A — bbox 추출 + 품질 확인 (게이트 통과, 44% 탐지율. `scripts/extract_bbox_cache.py`, `logs/bbox_cache.json` 244 에피소드)
 - [x] Phase 3 Step B — 데이터셋 통합 (`data/dataset.py`의 `bbox_cache_path`/`use_bbox_cond`, HFlip cx 반전 포함, unit test 통과)
 - [x] Phase 3 Step C — 모델 통합 (`Pi0VLA`의 `use_bbox_cond`/`bbox_only`, 3-way 조건 forward/loss 단위 테스트 통과)
-- [ ] Phase 3 Step D — 파일럿 학습/평가 (조건/epoch 수 등 실행 스코프 확정 필요, GPU 시간 소요 — 사용자 확인 후 실행)
-- [ ] Phase 4 재학습/재평가
+- [x] Phase 3 Step D — 파일럿 학습/평가 완료 (image_only 15% / bbox_only 20% / bbox+image 0%-깨짐, free n=20. 상세: ABLATION_RESULTS M11)
+- [ ] Phase 4 재학습/재평가 — bbox+image concat 버그 수정 또는 bbox_only 채택 여부 결정 필요
