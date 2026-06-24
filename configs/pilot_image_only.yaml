@@ -1,0 +1,56 @@
+# Phase 3 Step D 파일럿 — 조건 1/3: image_only (현재 baseline과 동일 구성)
+# python training/train.py --config configs/pilot_image_only.yaml
+
+model:
+  action_dim: 3
+  horizon: 10
+  hidden_dim: 512
+  n_flow_steps: 50
+
+  use_paligemma: true
+  load_pretrained_paligemma: true
+  paligemma_id: "google/paligemma-3b-pt-224"
+  vision_model_id: "google/siglip-so400m-patch14-384"
+  lang_model_id: "google/gemma-2b"
+  use_gemma_expert: false
+  load_lerobot: false
+
+  use_bbox_cond: false
+  bbox_only: false
+
+data:
+  train_path: /home/minum/26CS/MoNa-pi/mobile_vla_dataset_merged/
+  val_split: 0.1
+  window_size: 8
+  image_size: 224
+  preprocess: true
+  smooth: true
+  normalize: false
+  inject_prefix: true
+  use_delta: false
+
+  augment: true
+  use_color_jitter: true
+  use_random_crop: true
+  use_counterfactual: true
+  cf_stop_prob: 0.10
+  cf_steer_prob: 0.10
+
+train:
+  batch_size: 4
+  lr: 1.0e-4
+  epochs: 15              # Phase 3 파일럿 — 빠른 신호 확인용 (production epochs=30의 절반)
+  warmup_steps: 250
+  grad_clip: 1.0
+  checkpoint_dir: checkpoints/pilot_image_only
+  keep_top_k: 1
+  seed: 42
+
+pretrain:
+  ckpt_path: "checkpoints/lerobot_pi0_backbone"
+
+logging:
+  use_wandb: false
+  project: mona-pi
+  entity: shosae
+  log_every_n_steps: 20
